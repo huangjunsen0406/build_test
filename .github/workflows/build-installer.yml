@@ -30,14 +30,6 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
-      - name: 安装Inno Setup
-        run: |
-          choco install innosetup -y
-
-      - name: 设置Inno Setup路径
-        run: |
-          echo "INNO_SETUP_PATH=C:\Program Files (x86)\Inno Setup 6\ISCC.exe" >> $env:GITHUB_ENV
-
       - name: 克隆UnifyPy
         run: |
           git clone https://github.com/huangjunsen0406/UnifyPy.git
@@ -47,12 +39,18 @@ jobs:
           mkdir -p dist
           mkdir -p models
 
-      - name: 构建安装程序
+      - name: 构建可执行文件
         run: |
-          python UnifyPy/main.py . --config build.json
+          python UnifyPy/main.py . --config build.json --no-installer
         env:
           PYTHONIOENCODING: utf-8
           PYTHONUTF8: 1
+
+      - name: 使用Inno Setup构建安装程序
+        uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
+        with:
+          path: dist/installer/setup.iss
+          options: /O+
 
       - name: 上传构建产物
         uses: actions/upload-artifact@v4
@@ -150,5 +148,5 @@ jobs:
         with:
           name: linux-installer
           path: |
-            dist/installer/*.deb
+            dist/installer/xiaozhi_1.0.0_amd64.deb
             dist/xiaozhi/** 
