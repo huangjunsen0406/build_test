@@ -41,7 +41,7 @@ jobs:
 
       - name: 构建可执行文件
         run: |
-          python UnifyPy/main.py . --config build.json --no-installer
+          python UnifyPy/main.py . --config build.json
         env:
           PYTHONIOENCODING: utf-8
           PYTHONUTF8: 1
