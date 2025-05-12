@@ -13,6 +13,9 @@ jobs:
   build:
     name: 构建Windows安装程序
     runs-on: windows-latest
+    env:
+      PYTHONIOENCODING: utf-8
+      PYTHONUTF8: 1
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
@@ -36,6 +39,9 @@ jobs:
       - name: 准备打包
         run: |
           pyinstaller --noconfirm --onedir --windowed --icon="assets/xiaozhi_icon.ico" --add-data "assets;assets" --add-data "libs;libs" --add-data "src;src" --add-data "models;models" --hidden-import=PyQt5 --name "xiaozhi" "main.py"
+        env:
+          PYTHONIOENCODING: utf-8
+          PYTHONUTF8: 1
 
       - name: 创建Inno Setup脚本
         run: |

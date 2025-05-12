@@ -12,6 +12,9 @@ jobs:
   build-windows:
     name: 构建Windows安装程序
     runs-on: windows-latest
+    env:
+      PYTHONIOENCODING: utf-8
+      PYTHONUTF8: 1
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
@@ -39,13 +42,17 @@ jobs:
         run: |
           git clone https://github.com/huangjunsen0406/UnifyPy.git
 
-      - name: 创建dist目录
+      - name: 准备目录
         run: |
           mkdir -p dist
+          mkdir -p models
 
       - name: 构建安装程序
         run: |
           python UnifyPy/main.py . --config build.json
+        env:
+          PYTHONIOENCODING: utf-8
+          PYTHONUTF8: 1
 
       - name: 上传构建产物
         uses: actions/upload-artifact@v4
@@ -82,9 +89,10 @@ jobs:
         run: |
           git clone https://github.com/huangjunsen0406/UnifyPy.git
 
-      - name: 创建dist目录
+      - name: 准备目录
         run: |
           mkdir -p dist
+          mkdir -p models
 
       - name: 构建安装程序
         run: |
@@ -117,6 +125,7 @@ jobs:
           sudo apt-get install -y python3-pyaudio portaudio19-dev ffmpeg libopus0 libopus-dev build-essential python3-venv
           sudo apt-get install -y pulseaudio-utils
           sudo apt-get install -y dpkg-dev
+          sudo apt-get install -y libopenblas-dev liblapack-dev gfortran
 
       - name: 安装依赖
         run: |
@@ -127,9 +136,10 @@ jobs:
         run: |
           git clone https://github.com/huangjunsen0406/UnifyPy.git
 
-      - name: 创建dist目录
+      - name: 准备目录
         run: |
           mkdir -p dist
+          mkdir -p models
 
       - name: 构建安装程序
         run: |
