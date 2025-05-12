@@ -1,0 +1,96 @@
+name: Inno Setup 构建
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - 'documents/**'
+      - '**.md'
+      - '.github/workflows/vitepress.yml'
+      - '.github/workflows/build-installer.yml'
+
+jobs:
+  build:
+    name: 构建Windows安装程序
+    runs-on: windows-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置Python环境
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: 安装依赖
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: 准备打包
+        run: |
+          mkdir -p dist
+          pyinstaller --noconfirm --onedir --windowed --icon="assets/xiaozhi_icon.ico" --add-data "assets;assets" --add-data "libs;libs" --add-data "src;src" --add-data "models;models" --hidden-import=PyQt5 --name "xiaozhi" "main.py"
+
+      - name: 创建Inno Setup脚本
+        run: |
+          echo 'creating setup.iss file'
+          mkdir -p src
+          cat > src/setup.iss << 'EOL'
+          #define MyAppName "XiaoZhi"
+          #define MyAppVersion "1.0.0"
+          #define MyAppPublisher "Junsen"
+          #define MyAppURL "https://github.com/huangjunsen0406/build_test"
+          #define MyAppExeName "xiaozhi.exe"
+
+          [Setup]
+          AppId={{05DBB87C-AE34-4F2F-AEC5-3CD2AFE9DC90}}
+          AppName={#MyAppName}
+          AppVersion={#MyAppVersion}
+          AppPublisher={#MyAppPublisher}
+          AppPublisherURL={#MyAppURL}
+          AppSupportURL={#MyAppURL}
+          AppUpdatesURL={#MyAppURL}
+          DefaultDirName={autopf}\{#MyAppName}
+          DefaultGroupName={#MyAppName}
+          AllowNoIcons=yes
+          OutputDir=dist\installer
+          OutputBaseFilename=xiaozhi-setup
+          Compression=lzma
+          SolidCompression=yes
+          WizardStyle=modern
+
+          [Languages]
+          Name: "chinesesimplified"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
+          Name: "english"; MessagesFile: "compiler:Default.isl"
+
+          [Tasks]
+          Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+
+          [Files]
+          Source: "dist\xiaozhi\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+          Source: "dist\xiaozhi\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+          [Icons]
+          Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
+          Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+
+          [Run]
+          Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
+          EOL
+        shell: bash
+
+      - name: 编译安装程序
+        uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
+        with:
+          path: src/setup.iss
+          options: /O+
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer-inno
+          path: |
+            dist/installer/*.exe
+            dist/xiaozhi/** 

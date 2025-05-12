@@ -1,0 +1,150 @@
+name: 构建安装程序
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - 'documents/**'
+      - '**.md'
+      - '.github/workflows/vitepress.yml'
+
+jobs:
+  build-windows:
+    name: 构建Windows安装程序
+    runs-on: windows-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置Python环境
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: 安装依赖
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: 安装Inno Setup
+        run: |
+          choco install innosetup -y
+
+      - name: 设置Inno Setup路径
+        run: |
+          echo "INNO_SETUP_PATH=C:\Program Files (x86)\Inno Setup 6\ISCC.exe" >> $env:GITHUB_ENV
+
+      - name: 克隆UnifyPy
+        run: |
+          git clone https://github.com/huangjunsen0406/UnifyPy.git
+          cd UnifyPy
+          pip install -r requirements.txt
+
+      - name: 创建dist目录
+        run: |
+          mkdir -p dist
+
+      - name: 构建安装程序
+        run: |
+          python UnifyPy/main.py . --config build.json
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: |
+            dist/installer/*.exe
+            dist/xiaozhi/**
+
+  build-macos:
+    name: 构建macOS安装程序
+    runs-on: macos-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置Python环境
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: 安装系统依赖
+        run: |
+          brew install portaudio opus python-tk ffmpeg gfortran create-dmg
+          brew upgrade tcl-tk
+
+      - name: 安装依赖
+        run: |
+          pip install -r requirements_mac.txt
+          pip install pyinstaller
+
+      - name: 克隆UnifyPy
+        run: |
+          git clone https://github.com/huangjunsen0406/UnifyPy.git
+          cd UnifyPy
+          pip install -r requirements.txt
+
+      - name: 创建dist目录
+        run: |
+          mkdir -p dist
+
+      - name: 构建安装程序
+        run: |
+          python UnifyPy/main.py . --config build.json
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-installer
+          path: |
+            dist/installer/*.dmg
+            dist/xiaozhi/**
+
+  build-linux:
+    name: 构建Linux安装程序
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置Python环境
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: 安装系统依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-pyaudio portaudio19-dev ffmpeg libopus0 libopus-dev build-essential python3-venv
+          sudo apt-get install -y pulseaudio-utils
+          sudo apt-get install -y dpkg-dev
+
+      - name: 安装依赖
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: 克隆UnifyPy
+        run: |
+          git clone https://github.com/huangjunsen0406/UnifyPy.git
+          cd UnifyPy
+          pip install -r requirements.txt
+
+      - name: 创建dist目录
+        run: |
+          mkdir -p dist
+
+      - name: 构建安装程序
+        run: |
+          python UnifyPy/main.py . --config build.json
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-installer
+          path: |
+            dist/installer/*.deb
+            dist/xiaozhi/** 
