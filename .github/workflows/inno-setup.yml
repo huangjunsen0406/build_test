@@ -28,9 +28,13 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
-      - name: 准备打包
+      - name: 准备目录
         run: |
           mkdir -p dist
+          mkdir -p models
+
+      - name: 准备打包
+        run: |
           pyinstaller --noconfirm --onedir --windowed --icon="assets/xiaozhi_icon.ico" --add-data "assets;assets" --add-data "libs;libs" --add-data "src;src" --add-data "models;models" --hidden-import=PyQt5 --name "xiaozhi" "main.py"
 
       - name: 创建Inno Setup脚本
@@ -80,6 +84,10 @@ jobs:
           Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
           EOL
         shell: bash
+
+      - name: 创建installer目录
+        run: |
+          mkdir -p dist/installer
 
       - name: 编译安装程序
         uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
