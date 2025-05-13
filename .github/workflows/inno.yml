@@ -10,31 +10,61 @@ jobs:
     runs-on: windows-latest
 
     steps:
+      # 拉取仓库代码
       - name: 拉取仓库代码
         uses: actions/checkout@v4
 
+      # 安装 Inno Setup（通过 Chocolatey）
       - name: 安装 Inno Setup（通过 Chocolatey）
         run: choco install innosetup -y
         shell: powershell
 
+      # 查找 ISCC.exe 路径并写入 build.json
       - name: 查找 ISCC.exe 路径并写入 build.json
         run: |
-          # 获取 ISCC 路径
           $isccPath = Get-Command ISCC.exe | Select-Object -ExpandProperty Source
-
-          # 读取 JSON 内容
           $jsonPath = "build.json"
           $json = Get-Content $jsonPath -Raw | ConvertFrom-Json
-
-          # 设置新的 Inno Setup 路径
           $json.inno_setup_path = $isccPath
-
-          # 写回 JSON 文件，格式化为 UTF-8 编码
           $json | ConvertTo-Json -Depth 10 | Out-File -FilePath $jsonPath -Encoding UTF8
         shell: powershell
 
-      - name: 上传 build.json（可选）
-        uses: actions/upload-artifact@v4
+      # 安装 Miniconda
+      - name: 安装 Miniconda
+        uses: conda-incubator/setup-miniconda@v3
         with:
-          name: updated-build-config
-          path: build.json
+          activate-environment: py-xiaozhi
+          environment-name: py-xiaozhi
+          python-version: 3.10
+          auto-update-conda: true
+          auto-activate-base: false
+
+      # 安装 Python 依赖（pip + conda + pyinstaller）
+      - name: 安装 Python 依赖（pip + conda + pyinstaller）
+        shell: bash
+        run: |
+          # 激活 Conda 环境
+          source "$(conda info --base)/etc/profile.d/conda.sh"
+          conda activate py-xiaozhi
+
+          echo "✅ 当前 Python 位置：" $(which python)
+          python --version
+
+          # 安装 requirements（根据平台）
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            pip install -r requirements_mac.txt -i https://mirrors.aliyun.com/pypi/simple
+          else
+            pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple
+          fi
+
+          # 使用 conda 安装 PyQt5 和 OpenCV
+          conda install pyqt=5.15.10 opencv=4.10.0 -y
+
+          # Windows 平台安装额外依赖 wmi
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            pip install wmi
+          fi
+
+          # ✅ 安装 PyInstaller
+          pip install pyinstaller
+
