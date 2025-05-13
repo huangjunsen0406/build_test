@@ -100,19 +100,6 @@ jobs:
           auto-activate-base: false
           activate-environment: py-xiaozhi
 
-      # 创建 Conda 环境并安装依赖
-      - name: 创建 Conda 环境 py-xiaozhi
-        shell: bash -el {0}
-        run: conda create -n py-xiaozhi python=3.10 -y
-
-      # 创建一个简单的 requirements.txt 文件（如果不存在）
-      - name: 创建 requirements.txt
-        run: |
-          if (-not (Test-Path "requirements.txt")) {
-            Set-Content -Path "requirements.txt" -Value ""
-          }
-        shell: powershell
-
       # 安装 Python 依赖（pip + conda + pyinstaller）
       - name: 安装 Python 依赖（pip + conda + pyinstaller）
         shell: bash -el {0}
