@@ -234,7 +234,11 @@ jobs:
           sudo apt install -y build-essential python3-dev python3-pip python3-setuptools \
           libopenblas-dev liblapack-dev gfortran patchelf autoconf automake libtool \
           cmake libssl-dev libatlas-base-dev dpkg-dev \
-          python3-pyaudio portaudio19-dev ffmpeg libopus0 libopus-dev pulseaudio-utils
+          python3-pyaudio portaudio19-dev ffmpeg libopus0 libopus-dev pulseaudio-utils \
+          xvfb x11-utils libx11-dev libxtst-dev libxkbcommon-x11-dev \
+          libxcb-xinerama0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+          libxcb-randr0 libxcb-render-util0 libxcb-xkb1 libxkbcommon-x11-0 \
+          meson ninja-build
 
       - name: 安装 Miniconda 和 Conda (仅x64)
         if: matrix.arch == 'x64'
@@ -253,6 +257,9 @@ jobs:
           
           # 安装依赖
           pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple
+          
+          # 安装 meson 和 ninja
+          pip install meson ninja -i https://mirrors.aliyun.com/pypi/simple
 
           pip uninstall numpy -y
 
@@ -265,8 +272,11 @@ jobs:
           # 安装 Opus 库
           pip install opuslib -i https://mirrors.aliyun.com/pypi/simple
           
-          # 使用conda安装NumPy而不是从源码编译
-          conda install numpy=1.24.3 -y
+          # 安装 OpenBLAS 版本的 NumPy
+          export BLAS=openblas
+          export LAPACK=openblas
+          export NPY_NUM_BUILD_JOBS=$(nproc)
+          pip install numpy==1.24.3 --no-binary :all: -i https://mirrors.aliyun.com/pypi/simple
 
       - name: 创建工作目录结构 (仅x64)
         if: matrix.arch == 'x64'
@@ -284,6 +294,13 @@ jobs:
           export PYTHONUTF8=1
           export PYTHONUNBUFFERED=1
           
+          # 设置 Xvfb
+          export DISPLAY=:99
+          mkdir -p /tmp/.X11-unix
+          sudo chmod 1777 /tmp/.X11-unix
+          Xvfb :99 -screen 0 1024x768x24 -ac +extension GLX +render -noreset &
+          sleep 3
+          
           # 确保所有必要的目录存在
           mkdir -p models
           
@@ -300,6 +317,8 @@ jobs:
           ENV PYTHONUTF8=1
           ENV LC_ALL=C.UTF-8
           ENV LANG=C.UTF-8
+          ENV BLAS=openblas
+          ENV LAPACK=openblas
           
           # 安装基本工具和依赖
           RUN apt-get update || (apt-get clean && apt-get update) \
@@ -328,6 +347,21 @@ jobs:
               git \
               wget \
               ca-certificates \
+              xvfb \
+              x11-utils \
+              libx11-dev \
+              libxtst-dev \
+              libxkbcommon-x11-dev \
+              libxcb-xinerama0 \
+              libxcb-icccm4 \
+              libxcb-image0 \
+              libxcb-keysyms1 \
+              libxcb-randr0 \
+              libxcb-render-util0 \
+              libxcb-xkb1 \
+              libxkbcommon-x11-0 \
+              meson \
+              ninja-build \
               && apt-get clean \
               && rm -rf /var/lib/apt/lists/*
           
@@ -345,7 +379,7 @@ jobs:
           COPY . /app/
           
           # 创建conda环境
-          RUN conda create -n py-xiaozhi python=3.10 -y
+          RUN conda create -n py-xiaozhi python=3.10 -y --no-verify
           
           # 设置shell
           SHELL ["/bin/bash", "-c"]
@@ -353,10 +387,14 @@ jobs:
           # 安装依赖
           RUN source /opt/conda/bin/activate py-xiaozhi \
               && pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple \
+              && pip install meson ninja -i https://mirrors.aliyun.com/pypi/simple \
               && pip uninstall numpy -y \
+              && export BLAS=openblas \
+              && export LAPACK=openblas \
+              && export NPY_NUM_BUILD_JOBS=4 \
+              && pip install numpy==1.24.3 --no-binary :all: -i https://mirrors.aliyun.com/pypi/simple \
               && conda install pyqt=5.15.10 opencv=4.10.0 -y \
-              && pip install pyinstaller==6.13.0 opuslib -i https://mirrors.aliyun.com/pypi/simple \
-              && conda install numpy=1.24.3 -y
+              && pip install pyinstaller==6.13.0 opuslib -i https://mirrors.aliyun.com/pypi/simple
           
           # 克隆 UnifyPy
           RUN mkdir -p /UnifyPy \
@@ -367,6 +405,11 @@ jobs:
               && export PYTHONIOENCODING=utf-8 \
               && export PYTHONUTF8=1 \
               && export PYTHONUNBUFFERED=1 \
+              && export DISPLAY=:99 \
+              && mkdir -p /tmp/.X11-unix \
+              && chmod 1777 /tmp/.X11-unix \
+              && Xvfb :99 -screen 0 1024x768x24 -ac +extension GLX +render -noreset &> /dev/null & \
+              && sleep 3 \
               && mkdir -p models \
               && python -u /UnifyPy/main.py . --config ./build.json
           EOF
