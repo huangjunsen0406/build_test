@@ -98,6 +98,9 @@ jobs:
           conda install conda-forge::ffmpeg -y
           
           # 2. 安装 PyQt5 和 OpenCV（必须用 conda 安装，不能用 pip）
+          # 先安装 numpy，确保版本兼容
+          conda install numpy=1.24.3 -y
+          # 安装其他依赖
           conda install pyqt=5.15.10 opencv=4.10.0 -y
           
           # 3. 从 requirements.txt 安装其他依赖
@@ -108,6 +111,9 @@ jobs:
           
           # 5. 安装 PyInstaller
           pip install pyinstaller
+          
+          # 6. 验证 NumPy 能否正确导入
+          python -c "import numpy; import numpy.core; import numpy._core.multiarray; print('NumPy 导入成功!')"
           
           # 检查已安装的包
           echo "==== 查看已安装的包 ===="
