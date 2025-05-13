@@ -1,9 +1,9 @@
 {
-    "name": "build_test",
+    "name": "xiaozhi",
     "version": "1.0.0",
     "publisher": "Junsen",
     "entry": "main.py",
-    "icon": "assets/build_test_icon.ico",
+    "icon": "assets/xiaozhi_icon.ico",
     "hooks": "hooks",
     "onefile": false,
     "additional_pyinstaller_args": "--add-data assets;assets --add-data libs;libs --add-data src;src --hidden-import=PyQt5 --hidden-import=numpy._libs --hidden-import=opuslib",
@@ -32,8 +32,8 @@
         "macos": {
             "format": "app",
             "additional_pyinstaller_args": "--add-data assets:assets --add-data libs:libs --add-data src:src --add-data models:models --hidden-import=PyQt5 --windowed",
-            "app_bundle_name": "build_test.app",
-            "bundle_identifier": "com.junsen.build_test",
+            "app_bundle_name": "XiaoZhi.app",
+            "bundle_identifier": "com.junsen.xiaozhi",
             "sign_bundle": false,
             "create_dmg": true,
             "installer_options": {
