@@ -35,18 +35,19 @@ jobs:
       - name: 创建 Conda 环境 py-xiaozhi
         run: |
           conda create -n py-xiaozhi python=3.10 -y
-          conda activate py-xiaozhi
+        shell: powershell
 
       # 安装 Python 依赖（pip + conda + pyinstaller）
       - name: 安装 Python 依赖（pip + conda + pyinstaller）
         run: |
-          # 初始化 Conda 环境
-          conda activate py-xiaozhi
+          # 激活 Conda 环境
+          & "$(conda info --base)\Scripts\activate" py-xiaozhi
 
           # 安装依赖
           pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple
           conda install pyqt=5.15.10 opencv=4.10.0 -y
           pip install pyinstaller
+        shell: powershell
 
       # 拉取 UnifyPy 仓库
       - name: 拉取 UnifyPy 仓库
@@ -57,5 +58,6 @@ jobs:
       # 运行 UnifyPy 构建项目
       - name: 运行 UnifyPy 构建项目
         run: |
+          $env:PYTHONIOENCODING = "utf-8"
           python UnifyPy/main.py . --config build.json
         shell: bash
