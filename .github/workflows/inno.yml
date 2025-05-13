@@ -93,8 +93,9 @@ jobs:
         run: |
           conda activate py-xiaozhi
           
-          # 1. 先安装系统依赖 - FFmpeg 和 Opus（通过 conda）
-          conda install -c conda-forge ffmpeg opus -y
+          # 1. 先安装系统依赖 - FFmpeg 和 Opus（通过 conda 明确指定通道）
+          conda install conda-forge::libopus -y
+          conda install conda-forge::ffmpeg -y
           
           # 2. 安装 PyQt5 和 OpenCV（必须用 conda 安装，不能用 pip）
           conda install pyqt=5.15.10 opencv=4.10.0 -y
@@ -122,7 +123,14 @@ jobs:
         shell: bash -el {0}
         run: |
           conda activate py-xiaozhi
+          # 设置编码和环境变量
           export PYTHONIOENCODING=utf-8
+          export PYTHONUTF8=1
+          # 列出当前目录结构，确认文件存在
+          ls -la
+          echo "查看build.json内容:"
+          cat build.json
+          # 运行UnifyPy
           python UnifyPy/main.py . --config build.json
           
       # 只上传 Inno Setup 安装程序
