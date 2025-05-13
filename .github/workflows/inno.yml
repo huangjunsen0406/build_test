@@ -65,6 +65,11 @@ jobs:
           Write-Host "已更新 build.json 中的 Inno Setup 路径为: $isccPath"
         shell: powershell
 
+      # 安装 FFmpeg（添加系统依赖）
+      - name: 安装 FFmpeg
+        run: choco install ffmpeg -y
+        shell: powershell
+
       # 安装 Miniconda 和 Conda
       - name: 安装 Miniconda 和 Conda
         uses: conda-incubator/setup-miniconda@v3
@@ -87,15 +92,22 @@ jobs:
           }
         shell: powershell
 
-      # 安装 Python 依赖（pip + conda + pyinstaller）
-      - name: 安装 Python 依赖（pip + conda + pyinstaller）
+      # 按教程顺序安装 Python 依赖
+      - name: 安装 Python 依赖（按特定顺序）
         shell: bash -el {0}
         run: |
           conda activate py-xiaozhi
           
-          # 安装依赖
-          pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple
+          # 1. 安装 conda 依赖先（教程强调这些必须用 conda 安装，不能用 pip）
           conda install pyqt=5.15.10 opencv=4.10.0 -y
+          
+          # 2. 从 requirements.txt 安装其他依赖
+          pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple
+          
+          # 3. 安装 Windows 特定依赖
+          pip install wmi -i https://mirrors.aliyun.com/pypi/simple
+          
+          # 4. 安装 PyInstaller
           pip install pyinstaller
 
       # 拉取 UnifyPy 仓库
@@ -103,13 +115,19 @@ jobs:
         run: git clone https://github.com/huangjunsen0406/UnifyPy.git
         shell: bash
 
-      # 运行 UnifyPy 构建项目
+      # 运行 UnifyPy 构建项目（添加详细日志）
       - name: 运行 UnifyPy 构建项目
         shell: bash -el {0}
         run: |
           conda activate py-xiaozhi
           export PYTHONIOENCODING=utf-8
-          python UnifyPy/main.py . --config build.json
+          
+          # 查看环境中已安装的包
+          echo "==== 查看已安装的包 ===="
+          conda list
+          
+          # 添加 --verbose 参数获取更多日志
+          python UnifyPy/main.py . --config build.json --verbose
           
       # 只上传 Inno Setup 安装程序
       - name: 上传安装程序
