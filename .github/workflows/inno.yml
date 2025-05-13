@@ -100,7 +100,11 @@ jobs:
           
           # 安装 Opus 库
           pip install opuslib -i https://mirrors.aliyun.com/pypi/simple
-        
+          
+          # 安装 certifi 并设置 SSL_CERT_FILE 环境变量
+          pip install certifi -i https://mirrors.aliyun.com/pypi/simple
+          
+          conda install numpy=1.24.3 -y
 
       # 创建与本地环境类似的目录结构
       - name: 创建工作目录结构
@@ -117,6 +121,8 @@ jobs:
           export PYTHONIOENCODING=utf-8
           export PYTHONUTF8=1
           export PYTHONUNBUFFERED=1  # 确保Python输出不被缓冲
+          # 设置 SSL 证书路径
+          export SSL_CERT_FILE=$(python -m certifi)
           python -u ../UnifyPy/main.py . --config ./build.json  # 添加-u参数禁用输出缓冲
 
       # 重命名Windows安装程序为指定格式
@@ -271,8 +277,11 @@ jobs:
           # 安装 Opus 库
           pip install opuslib -i https://mirrors.aliyun.com/pypi/simple
           
+          # 安装 certifi 并设置 SSL_CERT_FILE 环境变量
+          pip install certifi -i https://mirrors.aliyun.com/pypi/simple
+          
           # 安装 OpenBLAS 版本的 NumPy (使用 conda)
-          conda install -c conda-forge numpy=1.24.3 blas=*=openblas -y
+          conda install numpy=1.24.3 blas=*=openblas -y
           
           # 验证 NumPy 使用的是 OpenBLAS
           python -c "import numpy; print('NumPy 配置:', numpy.__config__.show())"
@@ -292,6 +301,9 @@ jobs:
           export PYTHONIOENCODING=utf-8
           export PYTHONUTF8=1
           export PYTHONUNBUFFERED=1
+          
+          # 设置 SSL 证书路径
+          export SSL_CERT_FILE=$(python -m certifi)
           
           # 设置 Xvfb
           export DISPLAY=:99
@@ -376,19 +388,19 @@ jobs:
           COPY . /app/
           
           # 创建conda环境
-          RUN conda create -n py-xiaozhi python=3.10 -y
+          RUN conda create -n py-xiaozhi python=3.10 -y --no-verify
           
           # 设置shell
           SHELL ["/bin/bash", "-c"]
           
           # 安装依赖
           RUN source /opt/conda/bin/activate py-xiaozhi \
-              && pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple \
-              && pip install meson ninja -i https://mirrors.aliyun.com/pypi/simple \
+              && pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple --timeout 120 --retries 10 \
+              && pip install meson ninja -i https://pypi.tuna.tsinghua.edu.cn/simple --timeout 120 --retries 10 \
               && pip uninstall numpy -y \
               && conda install pyqt=5.15.10 opencv=4.10.0 -y \
-              && conda install -c conda-forge numpy=1.24.3 blas=*=openblas -y \
-              && pip install pyinstaller==6.13.0 opuslib -i https://mirrors.aliyun.com/pypi/simple
+              && conda install numpy=1.24.3 blas=*=openblas -y \
+              && pip install pyinstaller==6.13.0 opuslib certifi -i https://pypi.tuna.tsinghua.edu.cn/simple --timeout 120 --retries 10
           
           # 克隆 UnifyPy
           RUN mkdir -p /UnifyPy \
@@ -400,6 +412,7 @@ jobs:
               && export PYTHONUTF8=1 \
               && export PYTHONUNBUFFERED=1 \
               && export DISPLAY=:99 \
+              && export SSL_CERT_FILE=$(python -m certifi) \
               && mkdir -p /tmp/.X11-unix \
               && chmod 1777 /tmp/.X11-unix \
               && Xvfb :99 -screen 0 1024x768x24 -ac +extension GLX +render -noreset &> /dev/null & \
