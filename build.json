@@ -6,12 +6,12 @@
     "icon": "assets/xiaozhi_icon.ico",
     "hooks": "hooks",
     "onefile": false,
-    "additional_pyinstaller_args": "--add-data assets;assets --add-data libs;libs --add-data src;src --add-data models;models --hidden-import=PyQt5",
+    "additional_pyinstaller_args": "--add-data assets;assets --add-data libs;libs --add-data src;src --add-data models;models --hidden-import=PyQt5 --hidden-import=numpy._libs",
     "inno_setup_path": "E:\\application\\Inno Setup 6\\ISCC.exe",
     "platform_specific": {
         "windows": {
             "format": "exe",
-            "additional_pyinstaller_args": "--add-data assets;assets --add-data libs;libs --add-data src;src --add-data models;models --hidden-import=PyQt5 --noconsole",
+            "additional_pyinstaller_args": "--add-data assets;assets --add-data libs;libs --add-data src;src --add-data models;models --hidden-import=PyQt5 --noconsole --hidden-import=numpy._libs",
             "desktop_entry": true,
             "installer_options": {
                 "languages": ["ChineseSimplified", "English"],
