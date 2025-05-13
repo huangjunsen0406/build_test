@@ -9,18 +9,36 @@ jobs:
   setup-and-build:
     runs-on: windows-latest
     steps:
+      # 检出代码
+      - name: 检出代码
+        uses: actions/checkout@v4
+
       # 安装 Inno Setup
       - name: 安装 Inno Setup（通过 Chocolatey）
         run: choco install innosetup -y
         shell: powershell
 
-      # 查找 ISCC.exe 路径并设置环境变量
-      - name: 查找 ISCC.exe 路径并设置环境变量
+      # 查找 ISCC.exe 路径并更新 build.json
+      - name: 查找 ISCC.exe 路径并更新 build.json
         run: |
-          $path = Get-Command ISCC.exe | Select-Object -ExpandProperty Source
-          $envLine = "ISCC_PATH=$($path -replace '`r','' -replace '`n','')"
+          # 获取 ISCC 路径
+          $isccPath = Get-Command ISCC.exe | Select-Object -ExpandProperty Source
+          
+          # 设置环境变量
+          $envLine = "ISCC_PATH=$($isccPath -replace '`r','' -replace '`n','')"
           [System.IO.File]::AppendAllText($env:GITHUB_ENV, "$envLine`n", [System.Text.Encoding]::UTF8)
-          Set-Content -Path iscc_path.txt -Value $path -Encoding UTF8
+          
+          # 读取 JSON 内容
+          $jsonPath = "build.json"
+          $json = Get-Content $jsonPath -Raw | ConvertFrom-Json
+          
+          # 设置新的 Inno Setup 路径
+          $json.inno_setup_path = $isccPath
+          
+          # 写回 JSON 文件，格式化为 UTF-8 编码
+          $json | ConvertTo-Json -Depth 10 | Out-File -FilePath $jsonPath -Encoding UTF8
+          
+          Write-Host "已更新 build.json 中的 Inno Setup 路径为: $isccPath"
         shell: powershell
 
       # 安装 Miniconda 和 Conda
@@ -30,34 +48,50 @@ jobs:
           python-version: "3.10"
           auto-update-conda: true
           auto-activate-base: false
+          activate-environment: py-xiaozhi
 
       # 创建 Conda 环境并安装依赖
       - name: 创建 Conda 环境 py-xiaozhi
+        shell: bash -el {0}
+        run: conda create -n py-xiaozhi python=3.10 -y
+
+      # 创建一个简单的 requirements.txt 文件（如果不存在）
+      - name: 创建 requirements.txt
         run: |
-          conda create -n py-xiaozhi python=3.10 -y
+          if (-not (Test-Path "requirements.txt")) {
+            Set-Content -Path "requirements.txt" -Value ""
+          }
         shell: powershell
 
       # 安装 Python 依赖（pip + conda + pyinstaller）
       - name: 安装 Python 依赖（pip + conda + pyinstaller）
+        shell: bash -el {0}
         run: |
-          # 激活 Conda 环境
-          & "$(conda info --base)\Scripts\activate" py-xiaozhi
-
+          conda activate py-xiaozhi
+          
           # 安装依赖
           pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple
           conda install pyqt=5.15.10 opencv=4.10.0 -y
           pip install pyinstaller
-        shell: powershell
 
       # 拉取 UnifyPy 仓库
       - name: 拉取 UnifyPy 仓库
-        run: |
-          git clone https://github.com/huangjunsen0406/UnifyPy.git
-        shell: powershell
+        run: git clone https://github.com/huangjunsen0406/UnifyPy.git
+        shell: bash
 
       # 运行 UnifyPy 构建项目
       - name: 运行 UnifyPy 构建项目
+        shell: bash -el {0}
         run: |
-          $env:PYTHONIOENCODING = "utf-8"
+          conda activate py-xiaozhi
+          export PYTHONIOENCODING=utf-8
           python UnifyPy/main.py . --config build.json
-        shell: powershell
+          
+      # 上传构建结果（可选）
+      - name: 上传构建结果
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: |
+            dist/
+            output/
