@@ -119,6 +119,37 @@ jobs:
           export PYTHONUNBUFFERED=1  # 确保Python输出不被缓冲
           python -u ../UnifyPy/main.py . --config ./build.json  # 添加-u参数禁用输出缓冲
 
+      # 重命名Windows安装程序为指定格式
+      - name: 重命名Windows安装程序
+        shell: powershell
+        run: |
+          # 读取版本号
+          $jsonPath = "build.json"
+          $json = Get-Content $jsonPath -Raw | ConvertFrom-Json
+          $version = $json.version
+          $name = $json.name
+          
+          # 创建installer目录（如果不存在）
+          if (-not (Test-Path "installer")) {
+            New-Item -ItemType Directory -Path "installer" -Force
+          }
+          
+          # 查找安装程序文件
+          $setupFiles = Get-ChildItem -Path "installer" -Filter "*setup.exe"
+          
+          if ($setupFiles.Count -gt 0) {
+            foreach ($file in $setupFiles) {
+              $newName = "${name}_${version}_x64-setup.exe"
+              $newPath = Join-Path "installer" $newName
+              
+              # 重命名文件
+              Move-Item -Path $file.FullName -Destination $newPath -Force
+              Write-Host "已将安装程序重命名为: $newName"
+            }
+          } else {
+            Write-Host "未找到安装程序文件"
+          }
+
       # 只上传 Inno Setup 安装程序
       - name: 上传安装程序
         uses: actions/upload-artifact@v4
@@ -213,6 +244,47 @@ jobs:
           export PYTHONUTF8=1
           export PYTHONUNBUFFERED=1
           python -u ../UnifyPy/main.py . --config ./build.json
+
+      # 重命名Linux安装程序为指定格式
+      - name: 重命名Linux安装程序
+        shell: bash
+        run: |
+          # 读取版本号和名称
+          VERSION=$(python -c "import json; print(json.load(open('build.json'))['version'])")
+          NAME=$(python -c "import json; print(json.load(open('build.json'))['name'])")
+          
+          # 创建installer目录（如果不存在）
+          mkdir -p installer
+          
+          # 查找并重命名DEB文件
+          for file in installer/*.deb; do
+            if [ -f "$file" ]; then
+              new_name="${NAME}_${VERSION}_amd64.deb"
+              mv "$file" "installer/$new_name"
+              echo "已将安装程序重命名为: $new_name"
+            fi
+          done
+          
+          # 查找并重命名RPM文件
+          for file in installer/*.rpm; do
+            if [ -f "$file" ]; then
+              new_name="${NAME}_${VERSION}_amd64.rpm"
+              mv "$file" "installer/$new_name"
+              echo "已将安装程序重命名为: $new_name"
+            fi
+          done
+          
+          # 查找并重命名AppImage文件
+          for file in installer/*.AppImage; do
+            if [ -f "$file" ]; then
+              new_name="${NAME}_${VERSION}_amd64.AppImage"
+              mv "$file" "installer/$new_name"
+              echo "已将安装程序重命名为: $new_name"
+            fi
+          done
+          
+          # 列出installer目录内容
+          ls -la installer/
 
       - name: 上传 Linux 安装程序
         uses: actions/upload-artifact@v4
@@ -323,6 +395,47 @@ jobs:
           docker run --rm -v $(pwd):/app xiaozhi-arm64-builder
         shell: bash
 
+      # 重命名ARM64安装程序为指定格式
+      - name: 重命名ARM64安装程序
+        shell: bash
+        run: |
+          # 读取版本号和名称
+          VERSION=$(python -c "import json; print(json.load(open('build.json'))['version'])")
+          NAME=$(python -c "import json; print(json.load(open('build.json'))['name'])")
+          
+          # 创建installer目录（如果不存在）
+          mkdir -p installer
+          
+          # 查找并重命名DEB文件
+          for file in installer/*.deb; do
+            if [ -f "$file" ]; then
+              new_name="${NAME}_${VERSION}_arm64.deb"
+              mv "$file" "installer/$new_name"
+              echo "已将安装程序重命名为: $new_name"
+            fi
+          done
+          
+          # 查找并重命名RPM文件
+          for file in installer/*.rpm; do
+            if [ -f "$file" ]; then
+              new_name="${NAME}_${VERSION}_arm64.rpm"
+              mv "$file" "installer/$new_name"
+              echo "已将安装程序重命名为: $new_name"
+            fi
+          done
+          
+          # 查找并重命名AppImage文件
+          for file in installer/*.AppImage; do
+            if [ -f "$file" ]; then
+              new_name="${NAME}_${VERSION}_arm64.AppImage"
+              mv "$file" "installer/$new_name"
+              echo "已将安装程序重命名为: $new_name"
+            fi
+          done
+          
+          # 列出installer目录内容
+          ls -la installer/
+
       - name: 上传 ARM64 安装程序
         uses: actions/upload-artifact@v4
         with:
@@ -431,6 +544,47 @@ jobs:
           # 运行构建
           docker run --rm -v $(pwd):/app xiaozhi-arm-builder
         shell: bash
+
+      # 重命名ARM安装程序为指定格式
+      - name: 重命名ARM安装程序
+        shell: bash
+        run: |
+          # 读取版本号和名称
+          VERSION=$(python -c "import json; print(json.load(open('build.json'))['version'])")
+          NAME=$(python -c "import json; print(json.load(open('build.json'))['name'])")
+          
+          # 创建installer目录（如果不存在）
+          mkdir -p installer
+          
+          # 查找并重命名DEB文件
+          for file in installer/*.deb; do
+            if [ -f "$file" ]; then
+              new_name="${NAME}_${VERSION}_armhf.deb"
+              mv "$file" "installer/$new_name"
+              echo "已将安装程序重命名为: $new_name"
+            fi
+          done
+          
+          # 查找并重命名RPM文件
+          for file in installer/*.rpm; do
+            if [ -f "$file" ]; then
+              new_name="${NAME}_${VERSION}_armhf.rpm"
+              mv "$file" "installer/$new_name"
+              echo "已将安装程序重命名为: $new_name"
+            fi
+          done
+          
+          # 查找并重命名AppImage文件
+          for file in installer/*.AppImage; do
+            if [ -f "$file" ]; then
+              new_name="${NAME}_${VERSION}_armhf.AppImage"
+              mv "$file" "installer/$new_name"
+              echo "已将安装程序重命名为: $new_name"
+            fi
+          done
+          
+          # 列出installer目录内容
+          ls -la installer/
 
       - name: 上传 ARM 安装程序
         uses: actions/upload-artifact@v4
