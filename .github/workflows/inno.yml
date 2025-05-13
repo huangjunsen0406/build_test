@@ -276,6 +276,10 @@ jobs:
           export PYTHONIOENCODING=utf-8
           export PYTHONUTF8=1
           export PYTHONUNBUFFERED=1
+          
+          # 确保所有必要的目录存在
+          mkdir -p models
+          
           python -u ../UnifyPy/main.py . --config ./build.json
 
       - name: 创建 Docker 构建环境 (非x64)
@@ -290,8 +294,13 @@ jobs:
           ENV LC_ALL=C.UTF-8
           ENV LANG=C.UTF-8
           
+          # 配置DNS以解决网络问题
+          RUN echo "nameserver 8.8.8.8" > /etc/resolv.conf \
+              && echo "nameserver 8.8.4.4" >> /etc/resolv.conf
+          
           # 安装基本工具和依赖
-          RUN apt-get update && apt-get install -y \
+          RUN apt-get update || (apt-get clean && apt-get update) \
+              && apt-get install -y --no-install-recommends \
               build-essential \
               python3-dev \
               python3-pip \
@@ -315,12 +324,14 @@ jobs:
               pulseaudio-utils \
               git \
               wget \
-              && apt-get clean
+              ca-certificates \
+              && apt-get clean \
+              && rm -rf /var/lib/apt/lists/*
           
           # 安装 Miniconda
-          RUN wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-${{ matrix.platform }}.sh \
-              && bash Miniforge3-Linux-${{ matrix.platform }}.sh -b -p /opt/conda \
-              && rm Miniforge3-Linux-${{ matrix.platform }}.sh
+          RUN wget -q -O Miniforge3.sh "https://github.com/conda-forge/miniforge/releases/download/23.3.1-0/Miniforge3-Linux-${{ matrix.platform }}.sh" \
+              && bash Miniforge3.sh -b -p /opt/conda \
+              && rm Miniforge3.sh
           
           ENV PATH="/opt/conda/bin:\${PATH}"
           
@@ -353,14 +364,15 @@ jobs:
               && export PYTHONIOENCODING=utf-8 \
               && export PYTHONUTF8=1 \
               && export PYTHONUNBUFFERED=1 \
+              && mkdir -p models \
               && python -u /UnifyPy/main.py . --config ./build.json
           EOF
           
           # 构建 Docker 镜像
-          docker build -t xiaozhi-${{ matrix.arch }}-builder -f Dockerfile.${{ matrix.arch }} .
+          docker build --network=host --no-cache -t xiaozhi-${{ matrix.arch }}-builder -f Dockerfile.${{ matrix.arch }} .
           
           # 运行构建
-          docker run --platform linux/${{ matrix.qemu_platform }} --rm -v $(pwd):/app xiaozhi-${{ matrix.arch }}-builder
+          docker run --platform linux/${{ matrix.qemu_platform }} --network=host --rm -v $(pwd):/app xiaozhi-${{ matrix.arch }}-builder
         shell: bash
 
       # 重命名Linux安装程序为指定格式
