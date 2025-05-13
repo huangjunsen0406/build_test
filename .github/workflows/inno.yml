@@ -18,6 +18,30 @@ jobs:
         run: choco install innosetup -y
         shell: powershell
 
+      # 下载 ChineseSimplified.isl 文件
+      - name: 下载中文语言文件
+        run: |
+          $languageDir = "C:\Program Files (x86)\Inno Setup 6\Languages"
+          
+          # 确保目录存在
+          if (-not (Test-Path $languageDir)) {
+            New-Item -ItemType Directory -Path $languageDir -Force
+          }
+          
+          # 下载中文语言文件
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jrsoftware/issrc/main/Files/Languages/Unofficial/ChineseSimplified.isl" -OutFile "$languageDir\ChineseSimplified.isl"
+          
+          Write-Host "已下载中文语言文件到 $languageDir\ChineseSimplified.isl"
+          
+          # 验证文件是否存在
+          if (Test-Path "$languageDir\ChineseSimplified.isl") {
+            Write-Host "文件下载成功！"
+          } else {
+            Write-Error "文件下载失败！"
+            exit 1
+          }
+        shell: powershell
+
       # 查找 ISCC.exe 路径并更新 build.json
       - name: 查找 ISCC.exe 路径并更新 build.json
         run: |
