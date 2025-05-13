@@ -145,7 +145,16 @@ jobs:
 
       # 拉取 UnifyPy 仓库
       - name: 拉取 UnifyPy 仓库
-        run: git clone https://github.com/huangjunsen0406/UnifyPy.git
+        run: |
+          git clone https://github.com/huangjunsen0406/UnifyPy.git
+          echo "检查UnifyPy仓库内容"
+          ls -la UnifyPy
+          if [ -f "UnifyPy/main.py" ]; then
+            echo "UnifyPy/main.py 文件存在"
+          else
+            echo "UnifyPy/main.py 文件不存在！"
+            exit 1
+          fi
         shell: bash
 
       # 运行 UnifyPy 构建项目（去掉了 --verbose 参数）
@@ -167,8 +176,9 @@ jobs:
           echo "查看build.json内容:"
           cat build.json
           
-          # 运行UnifyPy时先通过encoding脚本
-          python -c "import sys; sys.stdout.reconfigure(encoding='utf-8'); sys.stderr.reconfigure(encoding='utf-8'); exec(open('UnifyPy/main.py', encoding='utf-8').read())" . --config build.json
+          # 运行UnifyPy (改回直接调用方式)
+          cd UnifyPy
+          python main.py .. --config ../build.json
 
       # 只上传 Inno Setup 安装程序
       - name: 上传安装程序
