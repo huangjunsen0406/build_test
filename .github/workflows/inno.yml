@@ -1,4 +1,4 @@
-name: Setup Inno Setup, Conda, and Build
+name: Setup and Build for Windows and Linux
 
 on:
   push:
@@ -13,7 +13,7 @@ env:
   LANG: C.UTF-8
 
 jobs:
-  setup-and-build:
+  build-windows:
     runs-on: windows-latest
     steps:
       # 检出代码
@@ -123,7 +123,7 @@ jobs:
       - name: 上传安装程序
         uses: actions/upload-artifact@v4
         with:
-          name: installer-setup
+          name: windows-installer
           path: installer/
 
       # 上传调试信息 (在失败情况下也执行)
@@ -131,7 +131,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: debug-info
+          name: windows-debug-info
           path: |
             build.json
             dist/
@@ -153,3 +153,298 @@ jobs:
           ls -la assets/ || echo "assets文件夹不存在"
           ls -la libs/ || echo "libs文件夹不存在"
           ls -la src/ || echo "src文件夹不存在"
+
+  build-linux-x64:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装系统依赖
+        run: |
+          sudo apt update
+          sudo apt install -y build-essential python3-dev python3-pip python3-setuptools \
+          libopenblas-dev liblapack-dev gfortran patchelf autoconf automake libtool \
+          cmake libssl-dev libatlas-base-dev dpkg-dev
+
+      - name: 安装 Miniconda 和 Conda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          python-version: "3.10"
+          auto-update-conda: true
+          auto-activate-base: false
+          activate-environment: py-xiaozhi
+
+      - name: 安装 Python 依赖
+        shell: bash -el {0}
+        run: |
+          conda activate py-xiaozhi
+          
+          # 安装依赖
+          pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple
+
+          pip uninstall numpy -y
+
+          conda install pyqt=5.15.10 opencv=4.10.0 -y
+          
+          # 安装 PyInstaller (使用特定版本)
+          pip install pyinstaller==6.13.0 -i https://mirrors.aliyun.com/pypi/simple
+          
+          # 安装 Opus 库
+          pip install opuslib -i https://mirrors.aliyun.com/pypi/simple
+          
+          # 安装 NumPy (从源码编译以确保优化)
+          export BLAS=openblas
+          export LAPACK=openblas
+          export NPY_NUM_BUILD_JOBS=$(nproc)
+          pip install numpy==1.24.3 --no-binary :all:
+
+      - name: 创建工作目录结构
+        run: |
+          mkdir -p ../UnifyPy
+          git clone https://github.com/huangjunsen0406/UnifyPy.git ../UnifyPy
+        shell: bash
+
+      - name: 运行 UnifyPy 构建 Linux 项目
+        shell: bash -el {0}
+        run: |
+          conda activate py-xiaozhi
+          export PYTHONIOENCODING=utf-8
+          export PYTHONUTF8=1
+          export PYTHONUNBUFFERED=1
+          python -u ../UnifyPy/main.py . --config ./build.json
+
+      - name: 上传 Linux 安装程序
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-x64-installer
+          path: installer/
+
+      - name: 上传 Linux 调试信息
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-x64-debug-info
+          path: |
+            build.json
+            dist/
+            xiaozhi.spec
+          continue-on-error: true
+
+  build-linux-arm64:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: 创建 ARM64 Docker 构建环境
+        run: |
+          cat > Dockerfile.arm64 << 'EOF'
+          FROM arm64v8/ubuntu:20.04
+          
+          ENV DEBIAN_FRONTEND=noninteractive
+          ENV PYTHONIOENCODING=utf-8
+          ENV PYTHONUTF8=1
+          ENV LC_ALL=C.UTF-8
+          ENV LANG=C.UTF-8
+          
+          # 安装基本工具和依赖
+          RUN apt-get update && apt-get install -y \
+              build-essential \
+              python3-dev \
+              python3-pip \
+              python3-setuptools \
+              libopenblas-dev \
+              liblapack-dev \
+              gfortran \
+              patchelf \
+              autoconf \
+              automake \
+              libtool \
+              cmake \
+              libssl-dev \
+              libatlas-base-dev \
+              dpkg-dev \
+              git \
+              wget \
+              && apt-get clean
+          
+          # 安装 Miniconda
+          RUN wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-aarch64.sh \
+              && bash Miniforge3-Linux-aarch64.sh -b -p /opt/conda \
+              && rm Miniforge3-Linux-aarch64.sh
+          
+          ENV PATH="/opt/conda/bin:${PATH}"
+          
+          # 创建工作目录
+          WORKDIR /app
+          
+          # 复制项目文件
+          COPY . /app/
+          
+          # 创建conda环境
+          RUN conda create -n py-xiaozhi python=3.10 -y
+          
+          # 设置shell
+          SHELL ["/bin/bash", "-c"]
+          
+          # 安装依赖
+          RUN source /opt/conda/bin/activate py-xiaozhi \
+              && pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple \
+              && pip uninstall numpy -y \
+              && conda install pyqt=5.15.10 opencv=4.10.0 -y \
+              && pip install pyinstaller==6.13.0 opuslib -i https://mirrors.aliyun.com/pypi/simple \
+              && export BLAS=openblas \
+              && export LAPACK=openblas \
+              && export NPY_NUM_BUILD_JOBS=$(nproc) \
+              && pip install numpy==1.24.3 --no-binary :all:
+          
+          # 克隆 UnifyPy
+          RUN mkdir -p /UnifyPy \
+              && git clone https://github.com/huangjunsen0406/UnifyPy.git /UnifyPy
+          
+          # 构建命令
+          CMD source /opt/conda/bin/activate py-xiaozhi \
+              && export PYTHONIOENCODING=utf-8 \
+              && export PYTHONUTF8=1 \
+              && export PYTHONUNBUFFERED=1 \
+              && python -u /UnifyPy/main.py . --config ./build.json
+          EOF
+          
+          # 构建 Docker 镜像
+          docker build -t xiaozhi-arm64-builder -f Dockerfile.arm64 .
+          
+          # 运行构建
+          docker run --rm -v $(pwd):/app xiaozhi-arm64-builder
+        shell: bash
+
+      - name: 上传 ARM64 安装程序
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-arm64-installer
+          path: installer/
+
+      - name: 上传 ARM64 调试信息
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-arm64-debug-info
+          path: |
+            build.json
+            dist/
+            xiaozhi.spec
+          continue-on-error: true
+
+  build-linux-arm:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm
+
+      - name: 创建 ARM Docker 构建环境
+        run: |
+          cat > Dockerfile.arm << 'EOF'
+          FROM arm32v7/ubuntu:20.04
+          
+          ENV DEBIAN_FRONTEND=noninteractive
+          ENV PYTHONIOENCODING=utf-8
+          ENV PYTHONUTF8=1
+          ENV LC_ALL=C.UTF-8
+          ENV LANG=C.UTF-8
+          
+          # 安装基本工具和依赖
+          RUN apt-get update && apt-get install -y \
+              build-essential \
+              python3-dev \
+              python3-pip \
+              python3-setuptools \
+              libopenblas-dev \
+              liblapack-dev \
+              gfortran \
+              patchelf \
+              autoconf \
+              automake \
+              libtool \
+              cmake \
+              libssl-dev \
+              libatlas-base-dev \
+              dpkg-dev \
+              git \
+              wget \
+              && apt-get clean
+          
+          # 安装 Miniconda
+          RUN wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-armv7l.sh \
+              && bash Miniforge3-Linux-armv7l.sh -b -p /opt/conda \
+              && rm Miniforge3-Linux-armv7l.sh
+          
+          ENV PATH="/opt/conda/bin:${PATH}"
+          
+          # 创建工作目录
+          WORKDIR /app
+          
+          # 复制项目文件
+          COPY . /app/
+          
+          # 创建conda环境
+          RUN conda create -n py-xiaozhi python=3.10 -y
+          
+          # 设置shell
+          SHELL ["/bin/bash", "-c"]
+          
+          # 安装依赖
+          RUN source /opt/conda/bin/activate py-xiaozhi \
+              && pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple \
+              && pip uninstall numpy -y \
+              && conda install pyqt=5.15.10 opencv=4.10.0 -y \
+              && pip install pyinstaller==6.13.0 opuslib -i https://mirrors.aliyun.com/pypi/simple \
+              && export BLAS=openblas \
+              && export LAPACK=openblas \
+              && export NPY_NUM_BUILD_JOBS=$(nproc) \
+              && pip install numpy==1.24.3 --no-binary :all:
+          
+          # 克隆 UnifyPy
+          RUN mkdir -p /UnifyPy \
+              && git clone https://github.com/huangjunsen0406/UnifyPy.git /UnifyPy
+          
+          # 构建命令
+          CMD source /opt/conda/bin/activate py-xiaozhi \
+              && export PYTHONIOENCODING=utf-8 \
+              && export PYTHONUTF8=1 \
+              && export PYTHONUNBUFFERED=1 \
+              && python -u /UnifyPy/main.py . --config ./build.json
+          EOF
+          
+          # 构建 Docker 镜像
+          docker build -t xiaozhi-arm-builder -f Dockerfile.arm .
+          
+          # 运行构建
+          docker run --rm -v $(pwd):/app xiaozhi-arm-builder
+        shell: bash
+
+      - name: 上传 ARM 安装程序
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-arm-installer
+          path: installer/
+
+      - name: 上传 ARM 调试信息
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-arm-debug-info
+          path: |
+            build.json
+            dist/
+            xiaozhi.spec
+          continue-on-error: true
