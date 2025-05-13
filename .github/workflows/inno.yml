@@ -42,7 +42,7 @@ jobs:
         uses: conda-incubator/setup-miniconda@v3
         with:
           env-name: py-xiaozhi   # 使用 env-name 替代 environment-name
-          python-version: 3.10
+          python-version: 3.10.5
           auto-update-conda: true
           auto-activate-base: false
 
