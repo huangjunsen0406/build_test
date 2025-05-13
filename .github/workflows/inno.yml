@@ -49,13 +49,28 @@ jobs:
           }
         shell: powershell
 
+      # 检查和修复 build.json 中可能的 BOM 问题
+      - name: 检查和修复 build.json 的 BOM
+        shell: bash
+        run: |
+          # 检查是否有 BOM 标记
+          if [ $(hexdump -n 3 -v -e '3/1 "%02X"' build.json) = "EFBBBF" ]; then
+            echo "发现 UTF-8 BOM 标记，移除中..."
+            # 使用 tail 命令移除 BOM
+            tail -c +4 build.json > build.json.tmp
+            mv build.json.tmp build.json
+            echo "BOM 已移除"
+          else
+            echo "无 BOM 标记，无需处理"
+          fi
+          
+          # 验证 JSON 文件格式
+          echo "验证 build.json 格式..."
+          python -c "import json; json.load(open('build.json')); print('JSON 格式正确')"
+
       # 查找 ISCC.exe 路径并更新 build.json
       - name: 查找 ISCC.exe 路径并更新 build.json
         run: |
-          # 确保PowerShell使用UTF-8编码
-          $OutputEncoding = [System.Text.Encoding]::UTF8
-          [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-          
           # 获取 ISCC 路径
           $isccPath = Get-Command ISCC.exe | Select-Object -ExpandProperty Source
           
@@ -88,14 +103,7 @@ jobs:
       # 创建 Conda 环境并安装依赖
       - name: 创建 Conda 环境 py-xiaozhi
         shell: bash -el {0}
-        run: |
-          # 设置UTF-8编码
-          export PYTHONIOENCODING=utf-8
-          export PYTHONUTF8=1
-          export LC_ALL=C.UTF-8
-          export LANG=C.UTF-8
-          
-          conda create -n py-xiaozhi python=3.10 -y
+        run: conda create -n py-xiaozhi python=3.10 -y
 
       # 创建一个简单的 requirements.txt 文件（如果不存在）
       - name: 创建 requirements.txt
@@ -105,80 +113,35 @@ jobs:
           }
         shell: powershell
 
-      # 按教程顺序安装 Python 依赖和系统依赖
-      - name: 安装依赖（按教程顺序）
+      # 安装 Python 依赖（pip + conda + pyinstaller）
+      - name: 安装 Python 依赖（pip + conda + pyinstaller）
         shell: bash -el {0}
         run: |
-          # 设置UTF-8编码
-          export PYTHONIOENCODING=utf-8
-          export PYTHONUTF8=1
-          export LC_ALL=C.UTF-8
-          export LANG=C.UTF-8
-          
           conda activate py-xiaozhi
           
-          # 1. 先安装系统依赖 - FFmpeg 和 Opus（通过 conda 明确指定通道）
-          conda install conda-forge::libopus -y
-          conda install conda-forge::ffmpeg -y
+          # 安装 NumPy (先安装确保版本兼容)
+          conda install numpy=1.26.4 -y
           
-          # 2. 安装 PyQt5 和 OpenCV（必须用 conda 安装，不能用 pip）
-          # 先安装 numpy，确保版本兼容
-          conda install numpy=1.24.3 -y
-          # 安装其他依赖
+          # 安装依赖
+          pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple
           conda install pyqt=5.15.10 opencv=4.10.0 -y
           
-          # 3. 从 requirements.txt 安装其他依赖
-          pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple
-          
-          # 4. 安装 Windows 特定依赖
-          pip install wmi -i https://mirrors.aliyun.com/pypi/simple
-          
-          # 5. 安装 PyInstaller
-          pip install pyinstaller
-          
-          # 6. 验证 NumPy 能否正确导入
-          python -c "import numpy; import numpy.core; import numpy._core.multiarray; print('NumPy 导入成功!')"
-          
-          # 检查已安装的包
-          echo "==== 查看已安装的包 ===="
-          conda list
+          # 安装 PyInstaller (使用特定版本)
+          pip install pyinstaller==6.13.0
 
       # 拉取 UnifyPy 仓库
       - name: 拉取 UnifyPy 仓库
-        run: |
-          git clone https://github.com/huangjunsen0406/UnifyPy.git
-          echo "检查UnifyPy仓库内容"
-          ls -la UnifyPy
-          if [ -f "UnifyPy/main.py" ]; then
-            echo "UnifyPy/main.py 文件存在"
-          else
-            echo "UnifyPy/main.py 文件不存在！"
-            exit 1
-          fi
+        run: git clone https://github.com/huangjunsen0406/UnifyPy.git
         shell: bash
 
-      # 运行 UnifyPy 构建项目（去掉了 --verbose 参数）
+      # 运行 UnifyPy 构建项目
       - name: 运行 UnifyPy 构建项目
         shell: bash -el {0}
         run: |
           conda activate py-xiaozhi
-          # 设置编码和环境变量
           export PYTHONIOENCODING=utf-8
           export PYTHONUTF8=1
-          export LC_ALL=C.UTF-8
-          export LANG=C.UTF-8
-          
-          # 为Python添加UTF-8默认编码
-          echo "import sys; sys.stdout.reconfigure(encoding='utf-8'); sys.stderr.reconfigure(encoding='utf-8');" > setup_encoding.py
-          
-          # 列出当前目录结构，确认文件存在
-          ls -la
-          echo "查看build.json内容:"
-          cat build.json
-          
-          # 运行UnifyPy (改回直接调用方式)
-          cd UnifyPy
-          python main.py .. --config ../build.json
+          python UnifyPy/main.py . --config build.json
 
       # 只上传 Inno Setup 安装程序
       - name: 上传安装程序
@@ -186,3 +149,14 @@ jobs:
         with:
           name: installer-setup
           path: installer/
+
+      # 上传调试信息 (在失败情况下也执行)
+      - name: 上传调试信息
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-info
+          path: |
+            build.json
+            dist/
+          continue-on-error: true
