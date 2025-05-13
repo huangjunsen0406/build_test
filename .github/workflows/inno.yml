@@ -19,8 +19,8 @@ jobs:
         run: |
           $path = Get-Command ISCC.exe | Select-Object -ExpandProperty Source
           Write-Output "ISCC 安装路径: $path"
-          # 使用 echo 命令设置环境变量
-          echo "ISCC_PATH=$path" >> $env:GITHUB_ENV
+          # 设置环境变量 ISCC_PATH
+          echo "ISCC_PATH=$path" | Out-File -FilePath $env:GITHUB_ENV -Append
         shell: powershell
 
       - name: 输出 ISCC 安装路径
