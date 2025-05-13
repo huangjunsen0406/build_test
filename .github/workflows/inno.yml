@@ -65,11 +65,6 @@ jobs:
           Write-Host "已更新 build.json 中的 Inno Setup 路径为: $isccPath"
         shell: powershell
 
-      # 安装 FFmpeg（添加系统依赖）
-      - name: 安装 FFmpeg
-        run: choco install ffmpeg -y
-        shell: powershell
-
       # 安装 Miniconda 和 Conda
       - name: 安装 Miniconda 和 Conda
         uses: conda-incubator/setup-miniconda@v3
@@ -92,42 +87,43 @@ jobs:
           }
         shell: powershell
 
-      # 按教程顺序安装 Python 依赖
-      - name: 安装 Python 依赖（按特定顺序）
+      # 按教程顺序安装 Python 依赖和系统依赖
+      - name: 安装依赖（按教程顺序）
         shell: bash -el {0}
         run: |
           conda activate py-xiaozhi
           
-          # 1. 安装 conda 依赖先（教程强调这些必须用 conda 安装，不能用 pip）
+          # 1. 先安装系统依赖 - FFmpeg 和 Opus（通过 conda）
+          conda install -c conda-forge ffmpeg opus -y
+          
+          # 2. 安装 PyQt5 和 OpenCV（必须用 conda 安装，不能用 pip）
           conda install pyqt=5.15.10 opencv=4.10.0 -y
           
-          # 2. 从 requirements.txt 安装其他依赖
+          # 3. 从 requirements.txt 安装其他依赖
           pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple
           
-          # 3. 安装 Windows 特定依赖
+          # 4. 安装 Windows 特定依赖
           pip install wmi -i https://mirrors.aliyun.com/pypi/simple
           
-          # 4. 安装 PyInstaller
+          # 5. 安装 PyInstaller
           pip install pyinstaller
+          
+          # 检查已安装的包
+          echo "==== 查看已安装的包 ===="
+          conda list
 
       # 拉取 UnifyPy 仓库
       - name: 拉取 UnifyPy 仓库
         run: git clone https://github.com/huangjunsen0406/UnifyPy.git
         shell: bash
 
-      # 运行 UnifyPy 构建项目（添加详细日志）
+      # 运行 UnifyPy 构建项目（去掉了 --verbose 参数）
       - name: 运行 UnifyPy 构建项目
         shell: bash -el {0}
         run: |
           conda activate py-xiaozhi
           export PYTHONIOENCODING=utf-8
-          
-          # 查看环境中已安装的包
-          echo "==== 查看已安装的包 ===="
-          conda list
-          
-          # 添加 --verbose 参数获取更多日志
-          python UnifyPy/main.py . --config build.json --verbose
+          python UnifyPy/main.py . --config build.json
           
       # 只上传 Inno Setup 安装程序
       - name: 上传安装程序
