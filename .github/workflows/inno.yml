@@ -399,8 +399,8 @@ jobs:
               && pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple --timeout 300 --retries 10 \
               && pip install meson ninja -i https://mirrors.aliyun.com/pypi/simple --timeout 300 --retries 10 \
               && pip uninstall numpy -y \
-              && conda install pyqt=5.15.7 opencv=4.8.0 -y --timeout-secs 600 \
-              && conda install numpy=1.24.3 blas=*=openblas -y --timeout-secs 600 \
+              && conda install pyqt=5.15.7 opencv=4.8.0 -y  \
+              && conda install numpy=1.24.3 blas=*=openblas -y  \
               && pip install pyinstaller==6.13.0 opuslib certifi -i https://mirrors.aliyun.com/pypi/simple --timeout 300 --retries 10
           
           # 克隆 UnifyPy
@@ -426,7 +426,7 @@ jobs:
           mkdir -p models && \
           python -u /UnifyPy/main.py . --config ./build.json"]
           EOF
-          
+
           # 构建 Docker 镜像
           docker buildx build --platform linux/${{ matrix.qemu_platform }} --load --cache-from type=local,src=/tmp/.buildx-cache --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max -t xiaozhi-${{ matrix.arch }}-builder -f Dockerfile.${{ matrix.arch }} . || { echo "Docker 构建失败"; exit 1; }
           
