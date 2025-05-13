@@ -92,6 +92,7 @@ jobs:
 
           pip uninstall numpy -y
 
+          # 使用conda安装PyQt5和OpenCV
           conda install pyqt=5.15.10 opencv=4.10.0 -y
           
           # 安装 PyInstaller (使用特定版本)
@@ -185,20 +186,51 @@ jobs:
           ls -la libs/ || echo "libs文件夹不存在"
           ls -la src/ || echo "src文件夹不存在"
 
-  build-linux-x64:
+  build-linux:
     runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, arm64, arm]
+        include:
+          - arch: x64
+            platform: x86_64
+            docker_image: ubuntu:22.04
+            arch_name: amd64
+            use_qemu: false
+          - arch: arm64
+            platform: aarch64
+            docker_image: arm64v8/ubuntu:22.04
+            arch_name: arm64
+            use_qemu: true
+            qemu_platform: arm64
+          - arch: arm
+            platform: armv7l
+            docker_image: arm32v7/ubuntu:22.04
+            arch_name: armhf
+            use_qemu: true
+            qemu_platform: arm
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
 
-      - name: 安装系统依赖
+      - name: 设置 QEMU
+        if: matrix.use_qemu
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: ${{ matrix.qemu_platform }}
+
+      - name: 安装系统依赖 (仅x64)
+        if: matrix.arch == 'x64'
         run: |
           sudo apt update
           sudo apt install -y build-essential python3-dev python3-pip python3-setuptools \
           libopenblas-dev liblapack-dev gfortran patchelf autoconf automake libtool \
-          cmake libssl-dev libatlas-base-dev dpkg-dev
+          cmake libssl-dev libatlas-base-dev dpkg-dev \
+          python3-pyaudio portaudio19-dev ffmpeg libopus0 libopus-dev pulseaudio-utils
 
-      - name: 安装 Miniconda 和 Conda
+      - name: 安装 Miniconda 和 Conda (仅x64)
+        if: matrix.arch == 'x64'
         uses: conda-incubator/setup-miniconda@v3
         with:
           python-version: "3.10"
@@ -206,7 +238,8 @@ jobs:
           auto-activate-base: false
           activate-environment: py-xiaozhi
 
-      - name: 安装 Python 依赖
+      - name: 安装 Python 依赖 (仅x64)
+        if: matrix.arch == 'x64'
         shell: bash -el {0}
         run: |
           conda activate py-xiaozhi
@@ -216,6 +249,7 @@ jobs:
 
           pip uninstall numpy -y
 
+          # 使用conda安装PyQt5和OpenCV
           conda install pyqt=5.15.10 opencv=4.10.0 -y
           
           # 安装 PyInstaller (使用特定版本)
@@ -230,13 +264,15 @@ jobs:
           export NPY_NUM_BUILD_JOBS=$(nproc)
           pip install numpy==1.24.3 --no-binary :all:
 
-      - name: 创建工作目录结构
+      - name: 创建工作目录结构 (仅x64)
+        if: matrix.arch == 'x64'
         run: |
           mkdir -p ../UnifyPy
           git clone https://github.com/huangjunsen0406/UnifyPy.git ../UnifyPy
         shell: bash
 
-      - name: 运行 UnifyPy 构建 Linux 项目
+      - name: 运行 UnifyPy 构建 Linux 项目 (仅x64)
+        if: matrix.arch == 'x64'
         shell: bash -el {0}
         run: |
           conda activate py-xiaozhi
@@ -244,6 +280,94 @@ jobs:
           export PYTHONUTF8=1
           export PYTHONUNBUFFERED=1
           python -u ../UnifyPy/main.py . --config ./build.json
+
+      - name: 创建 Docker 构建环境 (非x64)
+        if: matrix.arch != 'x64'
+        run: |
+          cat > Dockerfile.${{ matrix.arch }} << EOF
+          FROM ${{ matrix.docker_image }}
+          
+          ENV DEBIAN_FRONTEND=noninteractive
+          ENV PYTHONIOENCODING=utf-8
+          ENV PYTHONUTF8=1
+          ENV LC_ALL=C.UTF-8
+          ENV LANG=C.UTF-8
+          
+          # 安装基本工具和依赖
+          RUN apt-get update && apt-get install -y \
+              build-essential \
+              python3-dev \
+              python3-pip \
+              python3-setuptools \
+              libopenblas-dev \
+              liblapack-dev \
+              gfortran \
+              patchelf \
+              autoconf \
+              automake \
+              libtool \
+              cmake \
+              libssl-dev \
+              libatlas-base-dev \
+              dpkg-dev \
+              python3-pyaudio \
+              portaudio19-dev \
+              ffmpeg \
+              libopus0 \
+              libopus-dev \
+              pulseaudio-utils \
+              git \
+              wget \
+              && apt-get clean
+          
+          # 安装 Miniconda
+          RUN wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-${{ matrix.platform }}.sh \
+              && bash Miniforge3-Linux-${{ matrix.platform }}.sh -b -p /opt/conda \
+              && rm Miniforge3-Linux-${{ matrix.platform }}.sh
+          
+          ENV PATH="/opt/conda/bin:\${PATH}"
+          
+          # 创建工作目录
+          WORKDIR /app
+          
+          # 复制项目文件
+          COPY . /app/
+          
+          # 创建conda环境
+          RUN conda create -n py-xiaozhi python=3.10 -y
+          
+          # 设置shell
+          SHELL ["/bin/bash", "-c"]
+          
+          # 安装依赖
+          RUN source /opt/conda/bin/activate py-xiaozhi \
+              && pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple \
+              && pip uninstall numpy -y \
+              && conda install pyqt=5.15.10 opencv=4.10.0 -y \
+              && pip install pyinstaller==6.13.0 opuslib -i https://mirrors.aliyun.com/pypi/simple \
+              && export BLAS=openblas \
+              && export LAPACK=openblas \
+              && export NPY_NUM_BUILD_JOBS=\$(nproc) \
+              && pip install numpy==1.24.3 --no-binary :all:
+          
+          # 克隆 UnifyPy
+          RUN mkdir -p /UnifyPy \
+              && git clone https://github.com/huangjunsen0406/UnifyPy.git /UnifyPy
+          
+          # 构建命令
+          CMD source /opt/conda/bin/activate py-xiaozhi \
+              && export PYTHONIOENCODING=utf-8 \
+              && export PYTHONUTF8=1 \
+              && export PYTHONUNBUFFERED=1 \
+              && python -u /UnifyPy/main.py . --config ./build.json
+          EOF
+          
+          # 构建 Docker 镜像
+          docker build -t xiaozhi-${{ matrix.arch }}-builder -f Dockerfile.${{ matrix.arch }} .
+          
+          # 运行构建
+          docker run --rm -v $(pwd):/app xiaozhi-${{ matrix.arch }}-builder
+        shell: bash
 
       # 重命名Linux安装程序为指定格式
       - name: 重命名Linux安装程序
@@ -259,7 +383,7 @@ jobs:
           # 查找并重命名DEB文件
           for file in installer/*.deb; do
             if [ -f "$file" ]; then
-              new_name="${NAME}_${VERSION}_amd64.deb"
+              new_name="${NAME}_${VERSION}_${{ matrix.arch_name }}.deb"
               mv "$file" "installer/$new_name"
               echo "已将安装程序重命名为: $new_name"
             fi
@@ -268,7 +392,7 @@ jobs:
           # 查找并重命名RPM文件
           for file in installer/*.rpm; do
             if [ -f "$file" ]; then
-              new_name="${NAME}_${VERSION}_amd64.rpm"
+              new_name="${NAME}_${VERSION}_${{ matrix.arch_name }}.rpm"
               mv "$file" "installer/$new_name"
               echo "已将安装程序重命名为: $new_name"
             fi
@@ -277,7 +401,7 @@ jobs:
           # 查找并重命名AppImage文件
           for file in installer/*.AppImage; do
             if [ -f "$file" ]; then
-              new_name="${NAME}_${VERSION}_amd64.AppImage"
+              new_name="${NAME}_${VERSION}_${{ matrix.arch_name }}.AppImage"
               mv "$file" "installer/$new_name"
               echo "已将安装程序重命名为: $new_name"
             fi
@@ -289,314 +413,14 @@ jobs:
       - name: 上传Linux安装程序
         uses: actions/upload-artifact@v4
         with:
-          name: linux-x64-installer
+          name: linux-${{ matrix.arch }}-installer
           path: installer/
 
       - name: 上传Linux调试信息
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: linux-x64-debug-info
-          path: |
-            build.json
-            dist/
-            xiaozhi.spec
-          continue-on-error: true
-
-  build-linux-arm64:
-    runs-on: ubuntu-22.04
-    steps:
-      - name: 检出代码
-        uses: actions/checkout@v4
-
-      - name: 设置 QEMU
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm64
-
-      - name: 创建 ARM64 Docker 构建环境
-        run: |
-          cat > Dockerfile.arm64 << 'EOF'
-          FROM --platform=linux/arm64 ubuntu:22.04
-          
-          ENV DEBIAN_FRONTEND=noninteractive
-          ENV PYTHONIOENCODING=utf-8
-          ENV PYTHONUTF8=1
-          ENV LC_ALL=C.UTF-8
-          ENV LANG=C.UTF-8
-          
-          # 安装基本工具和依赖
-          RUN apt-get update && apt-get install -y \
-              build-essential \
-              python3-dev \
-              python3-pip \
-              python3-setuptools \
-              libopenblas-dev \
-              liblapack-dev \
-              gfortran \
-              patchelf \
-              autoconf \
-              automake \
-              libtool \
-              cmake \
-              libssl-dev \
-              libatlas-base-dev \
-              dpkg-dev \
-              git \
-              wget \
-              && apt-get clean
-          
-          # 安装 Miniconda
-          RUN wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-aarch64.sh \
-              && bash Miniforge3-Linux-aarch64.sh -b -p /opt/conda \
-              && rm Miniforge3-Linux-aarch64.sh
-          
-          ENV PATH="/opt/conda/bin:${PATH}"
-          
-          # 创建工作目录
-          WORKDIR /app
-          
-          # 复制项目文件
-          COPY . /app/
-          
-          # 创建conda环境
-          RUN conda create -n py-xiaozhi python=3.10 -y
-          
-          # 设置shell
-          SHELL ["/bin/bash", "-c"]
-          
-          # 安装依赖
-          RUN source /opt/conda/bin/activate py-xiaozhi \
-              && pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple \
-              && pip uninstall numpy -y \
-              && conda install pyqt=5.15.10 opencv=4.10.0 -y \
-              && pip install pyinstaller==6.13.0 opuslib -i https://mirrors.aliyun.com/pypi/simple \
-              && export BLAS=openblas \
-              && export LAPACK=openblas \
-              && export NPY_NUM_BUILD_JOBS=$(nproc) \
-              && pip install numpy==1.24.3 --no-binary :all:
-          
-          # 克隆 UnifyPy
-          RUN mkdir -p /UnifyPy \
-              && git clone https://github.com/huangjunsen0406/UnifyPy.git /UnifyPy
-          
-          # 构建命令
-          CMD source /opt/conda/bin/activate py-xiaozhi \
-              && export PYTHONIOENCODING=utf-8 \
-              && export PYTHONUTF8=1 \
-              && export PYTHONUNBUFFERED=1 \
-              && python -u /UnifyPy/main.py . --config ./build.json
-          EOF
-          
-          # 构建 Docker 镜像
-          docker build --platform linux/arm64 -t xiaozhi-arm64-builder -f Dockerfile.arm64 .
-          
-          # 运行构建
-          docker run --platform linux/arm64 --rm -v $(pwd):/app xiaozhi-arm64-builder
-        shell: bash
-
-      # 重命名ARM64安装程序为指定格式
-      - name: 重命名ARM64安装程序
-        shell: bash
-        run: |
-          # 读取版本号和名称
-          VERSION=$(python -c "import json; print(json.load(open('build.json'))['version'])")
-          NAME=$(python -c "import json; print(json.load(open('build.json'))['name'])")
-          
-          # 创建installer目录（如果不存在）
-          mkdir -p installer
-          
-          # 查找并重命名DEB文件
-          for file in installer/*.deb; do
-            if [ -f "$file" ]; then
-              new_name="${NAME}_${VERSION}_arm64.deb"
-              mv "$file" "installer/$new_name"
-              echo "已将安装程序重命名为: $new_name"
-            fi
-          done
-          
-          # 查找并重命名RPM文件
-          for file in installer/*.rpm; do
-            if [ -f "$file" ]; then
-              new_name="${NAME}_${VERSION}_arm64.rpm"
-              mv "$file" "installer/$new_name"
-              echo "已将安装程序重命名为: $new_name"
-            fi
-          done
-          
-          # 查找并重命名AppImage文件
-          for file in installer/*.AppImage; do
-            if [ -f "$file" ]; then
-              new_name="${NAME}_${VERSION}_arm64.AppImage"
-              mv "$file" "installer/$new_name"
-              echo "已将安装程序重命名为: $new_name"
-            fi
-          done
-          
-          # 列出installer目录内容
-          ls -la installer/
-
-      - name: 上传ARM64安装程序
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-arm64-installer
-          path: installer/
-
-      - name: 上传ARM64调试信息
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-arm64-debug-info
-          path: |
-            build.json
-            dist/
-            xiaozhi.spec
-          continue-on-error: true
-
-  build-linux-arm:
-    runs-on: ubuntu-22.04
-    steps:
-      - name: 检出代码
-        uses: actions/checkout@v4
-
-      - name: 设置 QEMU
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm
-
-      - name: 创建 ARM Docker 构建环境
-        run: |
-          cat > Dockerfile.arm << 'EOF'
-          FROM --platform=linux/arm/v7 ubuntu:22.04
-          
-          ENV DEBIAN_FRONTEND=noninteractive
-          ENV PYTHONIOENCODING=utf-8
-          ENV PYTHONUTF8=1
-          ENV LC_ALL=C.UTF-8
-          ENV LANG=C.UTF-8
-          
-          # 安装基本工具和依赖
-          RUN apt-get update && apt-get install -y \
-              build-essential \
-              python3-dev \
-              python3-pip \
-              python3-setuptools \
-              libopenblas-dev \
-              liblapack-dev \
-              gfortran \
-              patchelf \
-              autoconf \
-              automake \
-              libtool \
-              cmake \
-              libssl-dev \
-              libatlas-base-dev \
-              dpkg-dev \
-              git \
-              wget \
-              && apt-get clean
-          
-          # 安装 Miniconda
-          RUN wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-armv7l.sh \
-              && bash Miniforge3-Linux-armv7l.sh -b -p /opt/conda \
-              && rm Miniforge3-Linux-armv7l.sh
-          
-          ENV PATH="/opt/conda/bin:${PATH}"
-          
-          # 创建工作目录
-          WORKDIR /app
-          
-          # 复制项目文件
-          COPY . /app/
-          
-          # 创建conda环境
-          RUN conda create -n py-xiaozhi python=3.10 -y
-          
-          # 设置shell
-          SHELL ["/bin/bash", "-c"]
-          
-          # 安装依赖
-          RUN source /opt/conda/bin/activate py-xiaozhi \
-              && pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple \
-              && pip uninstall numpy -y \
-              && conda install pyqt=5.15.10 opencv=4.10.0 -y \
-              && pip install pyinstaller==6.13.0 opuslib -i https://mirrors.aliyun.com/pypi/simple \
-              && export BLAS=openblas \
-              && export LAPACK=openblas \
-              && export NPY_NUM_BUILD_JOBS=$(nproc) \
-              && pip install numpy==1.24.3 --no-binary :all:
-          
-          # 克隆 UnifyPy
-          RUN mkdir -p /UnifyPy \
-              && git clone https://github.com/huangjunsen0406/UnifyPy.git /UnifyPy
-          
-          # 构建命令
-          CMD source /opt/conda/bin/activate py-xiaozhi \
-              && export PYTHONIOENCODING=utf-8 \
-              && export PYTHONUTF8=1 \
-              && export PYTHONUNBUFFERED=1 \
-              && python -u /UnifyPy/main.py . --config ./build.json
-          EOF
-          
-          # 构建 Docker 镜像
-          docker build --platform linux/arm/v7 -t xiaozhi-arm-builder -f Dockerfile.arm .
-          
-          # 运行构建
-          docker run --platform linux/arm/v7 --rm -v $(pwd):/app xiaozhi-arm-builder
-        shell: bash
-
-      # 重命名ARM安装程序为指定格式
-      - name: 重命名ARM安装程序
-        shell: bash
-        run: |
-          # 读取版本号和名称
-          VERSION=$(python -c "import json; print(json.load(open('build.json'))['version'])")
-          NAME=$(python -c "import json; print(json.load(open('build.json'))['name'])")
-          
-          # 创建installer目录（如果不存在）
-          mkdir -p installer
-          
-          # 查找并重命名DEB文件
-          for file in installer/*.deb; do
-            if [ -f "$file" ]; then
-              new_name="${NAME}_${VERSION}_armhf.deb"
-              mv "$file" "installer/$new_name"
-              echo "已将安装程序重命名为: $new_name"
-            fi
-          done
-          
-          # 查找并重命名RPM文件
-          for file in installer/*.rpm; do
-            if [ -f "$file" ]; then
-              new_name="${NAME}_${VERSION}_armhf.rpm"
-              mv "$file" "installer/$new_name"
-              echo "已将安装程序重命名为: $new_name"
-            fi
-          done
-          
-          # 查找并重命名AppImage文件
-          for file in installer/*.AppImage; do
-            if [ -f "$file" ]; then
-              new_name="${NAME}_${VERSION}_armhf.AppImage"
-              mv "$file" "installer/$new_name"
-              echo "已将安装程序重命名为: $new_name"
-            fi
-          done
-          
-          # 列出installer目录内容
-          ls -la installer/
-
-      - name: 上传ARM安装程序
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-arm-installer
-          path: installer/
-
-      - name: 上传ARM调试信息
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-arm-debug-info
+          name: linux-${{ matrix.arch }}-debug-info
           path: |
             build.json
             dist/
