@@ -23,7 +23,7 @@ jobs:
           Set-Content -Path iscc_path.txt -Value $path -Encoding UTF8
         shell: powershell
 
-      # 安装 Miniconda 和 Python 环境
+      # 安装 Miniconda 和 Conda 环境
       - name: 安装 Miniconda 和 Conda 环境
         uses: conda-incubator/setup-miniconda@v3
         with:
@@ -36,8 +36,7 @@ jobs:
       - name: 安装 Python 依赖（pip + conda + pyinstaller）
         run: |
           # 初始化 Conda 环境
-          source "$(conda info --base)/etc/profile.d/conda.sh"
-          conda activate py-xiaozhi
+          & "$(conda info --base)\Scripts\activate" py-xiaozhi
 
           # 安装依赖
           pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple
