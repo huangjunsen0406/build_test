@@ -136,7 +136,7 @@ jobs:
           export PYTHONIOENCODING=utf-8
           export PYTHONUTF8=1
           export PYTHONUNBUFFERED=1  # 确保Python输出不被缓冲
-          python -u ../UnifyPy/main.py . --config build.json --verbose  # 添加-u参数禁用输出缓冲，并添加--verbose参数(如果UnifyPy支持)
+          python -u ../UnifyPy/main.py . --config build.json
 
       # 只上传 Inno Setup 安装程序
       - name: 上传安装程序
