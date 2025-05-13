@@ -338,7 +338,7 @@ jobs:
           COPY . /app/
           
           # 创建conda环境
-          RUN conda create -n py-xiaozhi python=3.10 -y
+          RUN conda create -n py-xiaozhi python=3.10 -y --no-verify
           
           # 设置shell
           SHELL ["/bin/bash", "-c"]
