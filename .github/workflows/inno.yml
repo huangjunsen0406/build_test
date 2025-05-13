@@ -49,52 +49,26 @@ jobs:
           }
         shell: powershell
 
-      # 检查和修复 build.json 中可能的 BOM 问题
-      - name: 检查和修复 build.json 的 BOM
-        shell: bash
-        run: |
-          # 使用更可靠的方法处理BOM
-          echo "重新创建build.json文件，确保没有BOM..."
-          # 读取文件内容并使用python处理，确保输出为UTF-8无BOM
-          python -c "
-          import json
-          try:
-              # 尝试使用utf-8-sig读取（处理可能的BOM）
-              with open('build.json', 'r', encoding='utf-8-sig') as f:
-                  data = json.load(f)
-              # 使用utf-8写回，不含BOM
-              with open('build.json', 'w', encoding='utf-8') as f:
-                  json.dump(data, f, indent=4, ensure_ascii=False)
-              print('成功移除BOM并重写build.json')
-          except Exception as e:
-              print(f'处理build.json时出错: {e}')
-              exit(1)
-          "
-          
-          # 验证JSON文件格式
-          echo "验证build.json格式..."
-          python -c "import json; json.load(open('build.json', 'r', encoding='utf-8')); print('JSON格式正确')"
-
       # 查找 ISCC.exe 路径并更新 build.json
       - name: 查找 ISCC.exe 路径并更新 build.json
         run: |
           # 获取 ISCC 路径
           $isccPath = Get-Command ISCC.exe | Select-Object -ExpandProperty Source
-          
+
           # 设置环境变量
           $envLine = "ISCC_PATH=$($isccPath -replace '`r','' -replace '`n','')"
           [System.IO.File]::AppendAllText($env:GITHUB_ENV, "$envLine`n", [System.Text.Encoding]::UTF8)
-          
+
           # 读取 JSON 内容
           $jsonPath = "build.json"
           $json = Get-Content $jsonPath -Raw | ConvertFrom-Json
-          
+
           # 设置新的 Inno Setup 路径
           $json.inno_setup_path = $isccPath
-          
-          # 写回 JSON 文件，格式化为 UTF-8 编码
-          $json | ConvertTo-Json -Depth 10 | Out-File -FilePath $jsonPath -Encoding UTF8
-          
+
+          # 写回 JSON 文件，使用不带 BOM 的 UTF-8
+          $json | ConvertTo-Json -Depth 10 | Set-Content -Path $jsonPath -Encoding utf8
+
           Write-Host "已更新 build.json 中的 Inno Setup 路径为: $isccPath"
         shell: powershell
 
