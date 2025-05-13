@@ -272,7 +272,7 @@ jobs:
           pip install opuslib -i https://mirrors.aliyun.com/pypi/simple
           
           # 安装 OpenBLAS 版本的 NumPy (使用 conda)
-          conda install numpy=1.24.3 blas=*=openblas -y
+          conda install -c conda-forge numpy=1.24.3 blas=*=openblas -y
           
           # 验证 NumPy 使用的是 OpenBLAS
           python -c "import numpy; print('NumPy 配置:', numpy.__config__.show())"
@@ -387,7 +387,7 @@ jobs:
               && pip install meson ninja -i https://mirrors.aliyun.com/pypi/simple \
               && pip uninstall numpy -y \
               && conda install pyqt=5.15.10 opencv=4.10.0 -y \
-              && conda install numpy=1.24.3 blas=*=openblas -y \
+              && conda install -c conda-forge numpy=1.24.3 blas=*=openblas -y \
               && pip install pyinstaller==6.13.0 opuslib -i https://mirrors.aliyun.com/pypi/simple
           
           # 克隆 UnifyPy
