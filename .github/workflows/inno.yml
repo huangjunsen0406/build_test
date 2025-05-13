@@ -8,7 +8,6 @@ on:
 jobs:
   install-inno:
     runs-on: windows-latest
-
     steps:
       # 安装 Inno Setup（通过 Chocolatey）
       - name: 安装 Inno Setup（通过 Chocolatey）
@@ -33,7 +32,7 @@ jobs:
 
   setup-conda-environment:
     runs-on: windows-latest
-
+    needs: install-inno  # 确保安装 Inno 后再执行
     steps:
       # 安装 Miniconda
       - name: 安装 Miniconda
@@ -59,7 +58,7 @@ jobs:
 
   clone-unifypy:
     runs-on: windows-latest
-
+    needs: setup-conda-environment  # 确保设置 Conda 后再拉取 UnifyPy
     steps:
       # 拉取 UnifyPy 仓库
       - name: 拉取 UnifyPy 仓库
