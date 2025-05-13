@@ -190,97 +190,223 @@ jobs:
     strategy:
       matrix:
         arch: [x64, arm64, arm]
+        include:
+          - arch: x64
+            platform: x86_64
+            docker_image: ubuntu:22.04
+            arch_name: amd64
+            use_qemu: false
+          - arch: arm64
+            platform: aarch64
+            docker_image: arm64v8/ubuntu:22.04
+            arch_name: arm64
+            use_qemu: true
+            qemu_platform: arm64
+          - arch: arm
+            platform: armv7l
+            docker_image: arm32v7/ubuntu:22.04
+            arch_name: armhf
+            use_qemu: true
+            qemu_platform: arm
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
 
-      - name: 设置 QEMU（仅用于非 x64 架构）
-        if: matrix.arch != 'x64'
+      - name: 设置 QEMU
+        if: matrix.use_qemu
         uses: docker/setup-qemu-action@v3
         with:
-          platforms: ${{ matrix.arch }}
+          platforms: ${{ matrix.qemu_platform }}
 
-      - name: 使用 Docker 构建 ${{ matrix.arch }} 架构
+      - name: 安装系统依赖 (仅x64)
+        if: matrix.arch == 'x64'
         run: |
-          ARCH=${{ matrix.arch }}
-          DOCKERFILE="Dockerfile.${ARCH}"
+          sudo apt update
+          sudo apt install -y build-essential python3-dev python3-pip python3-setuptools \
+          libopenblas-dev liblapack-dev gfortran patchelf autoconf automake libtool \
+          cmake libssl-dev libatlas-base-dev dpkg-dev
 
-          # 准备 Dockerfile
-          if [[ "$ARCH" == "x64" ]]; then
-            BASE_IMAGE="ubuntu:20.04"
-            MINIFORGE_URL="https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh"
-          elif [[ "$ARCH" == "arm64" ]]; then
-            BASE_IMAGE="arm64v8/ubuntu:20.04"
-            MINIFORGE_URL="https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-aarch64.sh"
-          elif [[ "$ARCH" == "arm" ]]; then
-            BASE_IMAGE="arm32v7/ubuntu:20.04"
-            MINIFORGE_URL="https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-armv7l.sh"
-          else
-            echo "不支持的架构：$ARCH"
-            exit 1
-          fi
+      - name: 安装 Miniconda 和 Conda (仅x64)
+        if: matrix.arch == 'x64'
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          python-version: "3.10"
+          auto-update-conda: true
+          auto-activate-base: false
+          activate-environment: py-xiaozhi
 
-          cat > $DOCKERFILE <<EOF
-          FROM $BASE_IMAGE
+      - name: 安装 Python 依赖 (仅x64)
+        if: matrix.arch == 'x64'
+        shell: bash -el {0}
+        run: |
+          conda activate py-xiaozhi
+          
+          # 安装依赖
+          pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple
+
+          pip uninstall numpy -y
+
+          conda install pyqt=5.15.10 opencv=4.10.0 -y
+          
+          # 安装 PyInstaller (使用特定版本)
+          pip install pyinstaller==6.13.0 -i https://mirrors.aliyun.com/pypi/simple
+          
+          # 安装 Opus 库
+          pip install opuslib -i https://mirrors.aliyun.com/pypi/simple
+          
+          # 安装 NumPy (从源码编译以确保优化)
+          export BLAS=openblas
+          export LAPACK=openblas
+          export NPY_NUM_BUILD_JOBS=$(nproc)
+          pip install numpy==1.24.3 --no-binary :all:
+
+      - name: 创建工作目录结构 (仅x64)
+        if: matrix.arch == 'x64'
+        run: |
+          mkdir -p ../UnifyPy
+          git clone https://github.com/huangjunsen0406/UnifyPy.git ../UnifyPy
+        shell: bash
+
+      - name: 运行 UnifyPy 构建 Linux 项目 (仅x64)
+        if: matrix.arch == 'x64'
+        shell: bash -el {0}
+        run: |
+          conda activate py-xiaozhi
+          export PYTHONIOENCODING=utf-8
+          export PYTHONUTF8=1
+          export PYTHONUNBUFFERED=1
+          python -u ../UnifyPy/main.py . --config ./build.json
+
+      - name: 创建 Docker 构建环境 (非x64)
+        if: matrix.arch != 'x64'
+        run: |
+          cat > Dockerfile.${{ matrix.arch }} << EOF
+          FROM ${{ matrix.docker_image }}
+          
           ENV DEBIAN_FRONTEND=noninteractive
           ENV PYTHONIOENCODING=utf-8
           ENV PYTHONUTF8=1
           ENV LC_ALL=C.UTF-8
           ENV LANG=C.UTF-8
-          RUN apt-get update && apt-get install -y \\
-              build-essential \\
-              python3-dev python3-pip python3-setuptools \\
-              libopenblas-dev liblapack-dev gfortran \\
-              patchelf autoconf automake libtool \\
-              cmake libssl-dev libatlas-base-dev dpkg-dev \\
-              git wget && apt-get clean
-          RUN wget $MINIFORGE_URL -O miniconda.sh \\
-              && bash miniconda.sh -b -p /opt/conda \\
-              && rm miniconda.sh
-          ENV PATH="/opt/conda/bin:\$PATH"
+          
+          # 安装基本工具和依赖
+          RUN apt-get update && apt-get install -y \
+              build-essential \
+              python3-dev \
+              python3-pip \
+              python3-setuptools \
+              libopenblas-dev \
+              liblapack-dev \
+              gfortran \
+              patchelf \
+              autoconf \
+              automake \
+              libtool \
+              cmake \
+              libssl-dev \
+              libatlas-base-dev \
+              dpkg-dev \
+              git \
+              wget \
+              && apt-get clean
+          
+          # 安装 Miniconda
+          RUN wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-${{ matrix.platform }}.sh \
+              && bash Miniforge3-Linux-${{ matrix.platform }}.sh -b -p /opt/conda \
+              && rm Miniforge3-Linux-${{ matrix.platform }}.sh
+          
+          ENV PATH="/opt/conda/bin:\${PATH}"
+          
+          # 创建工作目录
           WORKDIR /app
+          
+          # 复制项目文件
           COPY . /app/
+          
+          # 创建conda环境
           RUN conda create -n py-xiaozhi python=3.10 -y
+          
+          # 设置shell
           SHELL ["/bin/bash", "-c"]
-          RUN source /opt/conda/bin/activate py-xiaozhi \\
-              && pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple \\
-              && pip uninstall numpy -y \\
-              && conda install pyqt=5.15.10 opencv=4.10.0 -y \\
-              && pip install pyinstaller==6.13.0 opuslib -i https://mirrors.aliyun.com/pypi/simple \\
-              && export BLAS=openblas \\
-              && export LAPACK=openblas \\
-              && export NPY_NUM_BUILD_JOBS=\$(nproc) \\
+          
+          # 安装依赖
+          RUN source /opt/conda/bin/activate py-xiaozhi \
+              && pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple \
+              && pip uninstall numpy -y \
+              && conda install pyqt=5.15.10 opencv=4.10.0 -y \
+              && pip install pyinstaller==6.13.0 opuslib -i https://mirrors.aliyun.com/pypi/simple \
+              && export BLAS=openblas \
+              && export LAPACK=openblas \
+              && export NPY_NUM_BUILD_JOBS=\$(nproc) \
               && pip install numpy==1.24.3 --no-binary :all:
-          RUN git clone https://github.com/huangjunsen0406/UnifyPy.git /UnifyPy
-          CMD source /opt/conda/bin/activate py-xiaozhi \\
+          
+          # 克隆 UnifyPy
+          RUN mkdir -p /UnifyPy \
+              && git clone https://github.com/huangjunsen0406/UnifyPy.git /UnifyPy
+          
+          # 构建命令
+          CMD source /opt/conda/bin/activate py-xiaozhi \
+              && export PYTHONIOENCODING=utf-8 \
+              && export PYTHONUTF8=1 \
+              && export PYTHONUNBUFFERED=1 \
               && python -u /UnifyPy/main.py . --config ./build.json
           EOF
+          
+          # 构建 Docker 镜像
+          docker build -t xiaozhi-${{ matrix.arch }}-builder -f Dockerfile.${{ matrix.arch }} .
+          
+          # 运行构建
+          docker run --rm -v $(pwd):/app xiaozhi-${{ matrix.arch }}-builder
+        shell: bash
 
-          docker build -t unifypy-${ARCH}-builder -f $DOCKERFILE .
-          docker run --rm -v $(pwd):/app unifypy-${ARCH}-builder
-
-      - name: 重命名安装包
+      # 重命名Linux安装程序为指定格式
+      - name: 重命名Linux安装程序
+        shell: bash
         run: |
-          VERSION=$(python3 -c "import json; print(json.load(open('build.json'))['version'])")
-          NAME=$(python3 -c "import json; print(json.load(open('build.json'))['name'])")
+          # 读取版本号和名称
+          VERSION=$(python -c "import json; print(json.load(open('build.json'))['version'])")
+          NAME=$(python -c "import json; print(json.load(open('build.json'))['name'])")
+          
+          # 创建installer目录（如果不存在）
           mkdir -p installer
-          for file in installer/*; do
-            ext="${file##*.}"
-            if [[ -f "$file" ]]; then
-              new_name="${NAME}_${VERSION}_${{ matrix.arch }}.${ext}"
+          
+          # 查找并重命名DEB文件
+          for file in installer/*.deb; do
+            if [ -f "$file" ]; then
+              new_name="${NAME}_${VERSION}_${{ matrix.arch_name }}.deb"
               mv "$file" "installer/$new_name"
-              echo "已重命名安装包: $new_name"
+              echo "已将安装程序重命名为: $new_name"
             fi
           done
+          
+          # 查找并重命名RPM文件
+          for file in installer/*.rpm; do
+            if [ -f "$file" ]; then
+              new_name="${NAME}_${VERSION}_${{ matrix.arch_name }}.rpm"
+              mv "$file" "installer/$new_name"
+              echo "已将安装程序重命名为: $new_name"
+            fi
+          done
+          
+          # 查找并重命名AppImage文件
+          for file in installer/*.AppImage; do
+            if [ -f "$file" ]; then
+              new_name="${NAME}_${VERSION}_${{ matrix.arch_name }}.AppImage"
+              mv "$file" "installer/$new_name"
+              echo "已将安装程序重命名为: $new_name"
+            fi
+          done
+          
+          # 列出installer目录内容
           ls -la installer/
 
-      - name: 上传构建产物
+      - name: 上传Linux安装程序
         uses: actions/upload-artifact@v4
         with:
           name: linux-${{ matrix.arch }}-installer
           path: installer/
 
-      - name: 上传调试信息
+      - name: 上传Linux调试信息
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -290,5 +416,3 @@ jobs:
             dist/
             xiaozhi.spec
           continue-on-error: true
-
-
