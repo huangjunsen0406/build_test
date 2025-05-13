@@ -53,20 +53,27 @@ jobs:
       - name: 检查和修复 build.json 的 BOM
         shell: bash
         run: |
-          # 检查是否有 BOM 标记
-          if [ $(hexdump -n 3 -v -e '3/1 "%02X"' build.json) = "EFBBBF" ]; then
-            echo "发现 UTF-8 BOM 标记，移除中..."
-            # 使用 tail 命令移除 BOM
-            tail -c +4 build.json > build.json.tmp
-            mv build.json.tmp build.json
-            echo "BOM 已移除"
-          else
-            echo "无 BOM 标记，无需处理"
-          fi
+          # 使用更可靠的方法处理BOM
+          echo "重新创建build.json文件，确保没有BOM..."
+          # 读取文件内容并使用python处理，确保输出为UTF-8无BOM
+          python -c "
+          import json
+          try:
+              # 尝试使用utf-8-sig读取（处理可能的BOM）
+              with open('build.json', 'r', encoding='utf-8-sig') as f:
+                  data = json.load(f)
+              # 使用utf-8写回，不含BOM
+              with open('build.json', 'w', encoding='utf-8') as f:
+                  json.dump(data, f, indent=4, ensure_ascii=False)
+              print('成功移除BOM并重写build.json')
+          except Exception as e:
+              print(f'处理build.json时出错: {e}')
+              exit(1)
+          "
           
-          # 验证 JSON 文件格式
-          echo "验证 build.json 格式..."
-          python -c "import json; json.load(open('build.json')); print('JSON 格式正确')"
+          # 验证JSON文件格式
+          echo "验证build.json格式..."
+          python -c "import json; json.load(open('build.json', 'r', encoding='utf-8')); print('JSON格式正确')"
 
       # 查找 ISCC.exe 路径并更新 build.json
       - name: 查找 ISCC.exe 路径并更新 build.json
@@ -136,7 +143,7 @@ jobs:
           export PYTHONIOENCODING=utf-8
           export PYTHONUTF8=1
           export PYTHONUNBUFFERED=1  # 确保Python输出不被缓冲
-          python -u ../UnifyPy/main.py . --config build.json
+          python -u ../UnifyPy/main.py . --config ./build.json  # 添加-u参数禁用输出缓冲
 
       # 只上传 Inno Setup 安装程序
       - name: 上传安装程序
