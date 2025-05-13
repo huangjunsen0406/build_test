@@ -414,7 +414,7 @@ jobs:
           export PYTHONUTF8=1 && \
           export PYTHONUNBUFFERED=1 && \
           export DISPLAY=:99 && \
-          export SSL_CERT_FILE=$(python -m certifi) && \
+          export SSL_CERT_FILE=/opt/conda/envs/py-xiaozhi/lib/python3.10/site-packages/certifi/cacert.pem && \
           mkdir -p /tmp/.X11-unix && \
           chmod 1777 /tmp/.X11-unix && \
           Xvfb :99 -screen 0 1024x768x24 -ac +extension GLX +render -noreset &> /dev/null & \
@@ -425,21 +425,27 @@ jobs:
           conda list && \
           mkdir -p models && \
           python -u /UnifyPy/main.py . --config ./build.json"]
-
+          EOF
           
           # 构建 Docker 镜像
-          docker buildx build --platform linux/${{ matrix.qemu_platform }} --load --cache-from type=local,src=/tmp/.buildx-cache --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max -t xiaozhi-${{ matrix.arch }}-builder -f Dockerfile.${{ matrix.arch }} .
+          docker buildx build --platform linux/${{ matrix.qemu_platform }} --load --cache-from type=local,src=/tmp/.buildx-cache --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max -t xiaozhi-${{ matrix.arch }}-builder -f Dockerfile.${{ matrix.arch }} . || { echo "Docker 构建失败"; exit 1; }
           
           # 运行构建
-          docker run --platform linux/${{ matrix.qemu_platform }} --network=host --dns 8.8.8.8 --dns 8.8.4.4 --memory=6g --memory-swap=8g --rm -v $(pwd):/app xiaozhi-${{ matrix.arch }}-builder
+          docker run --platform linux/${{ matrix.qemu_platform }} --network=host --dns 8.8.8.8 --dns 8.8.4.4 --memory=6g --memory-swap=8g --rm -v $(pwd):/app xiaozhi-${{ matrix.arch }}-builder || { echo "Docker 容器运行失败"; exit 1; }
         shell: bash
         
       # 移动缓存
       - name: 移动缓存
         if: matrix.arch != 'x64'
         run: |
-          rm -rf /tmp/.buildx-cache
-          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+          if [ -d "/tmp/.buildx-cache-new" ]; then
+            rm -rf /tmp/.buildx-cache || true
+            mkdir -p /tmp/.buildx-cache
+            mv /tmp/.buildx-cache-new/* /tmp/.buildx-cache/ || true
+            rm -rf /tmp/.buildx-cache-new || true
+          else
+            echo "警告: /tmp/.buildx-cache-new 目录不存在，跳过缓存移动"
+          fi
         shell: bash
 
       # 重命名Linux安装程序为指定格式
