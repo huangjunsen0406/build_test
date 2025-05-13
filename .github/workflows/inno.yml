@@ -258,11 +258,8 @@ jobs:
           # 安装 Opus 库
           pip install opuslib -i https://mirrors.aliyun.com/pypi/simple
           
-          # 安装 NumPy (从源码编译以确保优化)
-          export BLAS=openblas
-          export LAPACK=openblas
-          export NPY_NUM_BUILD_JOBS=$(nproc)
-          pip install numpy==1.24.3 --no-binary :all:
+          # 使用conda安装NumPy而不是从源码编译
+          conda install numpy=1.24.3 -y
 
       - name: 创建工作目录结构 (仅x64)
         if: matrix.arch == 'x64'
@@ -345,10 +342,7 @@ jobs:
               && pip uninstall numpy -y \
               && conda install pyqt=5.15.10 opencv=4.10.0 -y \
               && pip install pyinstaller==6.13.0 opuslib -i https://mirrors.aliyun.com/pypi/simple \
-              && export BLAS=openblas \
-              && export LAPACK=openblas \
-              && export NPY_NUM_BUILD_JOBS=\$(nproc) \
-              && pip install numpy==1.24.3 --no-binary :all:
+              && conda install numpy=1.24.3 -y
           
           # 克隆 UnifyPy
           RUN mkdir -p /UnifyPy \
@@ -366,7 +360,7 @@ jobs:
           docker build -t xiaozhi-${{ matrix.arch }}-builder -f Dockerfile.${{ matrix.arch }} .
           
           # 运行构建
-          docker run --rm -v $(pwd):/app xiaozhi-${{ matrix.arch }}-builder
+          docker run --platform linux/${{ matrix.qemu_platform }} --rm -v $(pwd):/app xiaozhi-${{ matrix.arch }}-builder
         shell: bash
 
       # 重命名Linux安装程序为指定格式
