@@ -109,10 +109,14 @@ jobs:
           # 安装依赖
           pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple
 
+          pip uninstall numpy -y
+
           conda install pyqt=5.15.10 opencv=4.10.0 -y
           
           # 安装 PyInstaller (使用特定版本)
           pip install pyinstaller==6.13.0 wmi -i https://mirrors.aliyun.com/pypi/simple
+
+          conda install numpy=1.24.3 -y
 
       # 拉取 UnifyPy 仓库
       - name: 拉取 UnifyPy 仓库
