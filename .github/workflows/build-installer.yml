@@ -103,10 +103,16 @@ jobs:
           cd build_test
           python ../UnifyPy/main.py . --config build.json
           
+      - name: List output files
+        shell: bash -el {0}
+        run: |
+          echo "Listing dist directory:"
+          ls -la build_test/dist/ || echo "dist directory not found or empty"
+          echo "Listing installer directory:"
+          ls -la build_test/installer/ || echo "installer directory not found or empty"
+          
       - name: Upload artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v1
         with:
           name: build-test-package
-          path: |
-            build_test/dist/**/*.exe
-            build_test/installer/**/*.exe
+          path: build_test
