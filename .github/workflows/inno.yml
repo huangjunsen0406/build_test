@@ -121,12 +121,8 @@ jobs:
           
           # 安装依赖
           pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple
+          
           conda install pyqt=5.15.10 opencv=4.10.0 -y
-
-          pip uninstall numpy -y
-
-          # 安装 NumPy (先安装确保版本兼容)
-          conda install numpy
           
           # 安装 PyInstaller (使用特定版本)
           pip install pyinstaller==6.13.0
