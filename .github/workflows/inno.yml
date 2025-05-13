@@ -21,8 +21,6 @@ jobs:
           $path = Get-Command ISCC.exe | Select-Object -ExpandProperty Source
           $envLine = "ISCC_PATH=$($path -replace '`r','' -replace '`n','')"
           [System.IO.File]::AppendAllText($env:GITHUB_ENV, "$envLine`n", [System.Text.Encoding]::UTF8)
-
-          # （可选）写入一个临时文件中方便上传或调试
           Set-Content -Path iscc_path.txt -Value $path -Encoding UTF8
         shell: powershell
 
@@ -41,38 +39,22 @@ jobs:
       - name: 安装 Miniconda
         uses: conda-incubator/setup-miniconda@v3
         with:
-          env-name: py-xiaozhi   # 使用 env-name 替代 environment-name
+          env-name: py-xiaozhi
           python-version: 3.10.5
           auto-update-conda: true
           auto-activate-base: false
 
-      # 安装 Python 依赖（pip + conda + pyinstaller）
+      # 安装 Python 依赖
       - name: 安装 Python 依赖（pip + conda + pyinstaller）
         shell: bash
         run: |
-          # 激活 Conda 环境
+          # 初始化 Conda 环境
           source "$(conda info --base)/etc/profile.d/conda.sh"
           conda activate py-xiaozhi
 
-          echo "✅ 当前 Python 位置：" $(which python)
-          python --version
-
-          # 安装 requirements（根据平台）
-          if [[ "$RUNNER_OS" == "macOS" ]]; then
-            pip install -r requirements_mac.txt -i https://mirrors.aliyun.com/pypi/simple
-          else
-            pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple
-          fi
-
-          # 使用 conda 安装 PyQt5 和 OpenCV
+          # 安装要求的依赖
+          pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple
           conda install pyqt=5.15.10 opencv=4.10.0 -y
-
-          # Windows 平台安装额外依赖 wmi
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            pip install wmi
-          fi
-
-          # ✅ 安装 PyInstaller
           pip install pyinstaller
 
   clone-unifypy:
