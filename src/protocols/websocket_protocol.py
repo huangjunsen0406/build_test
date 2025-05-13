@@ -1,8 +1,9 @@
+import ssl  # 需要在文件顶部导入
 import asyncio
 import json
 import logging
 import websockets
-
+ssl_context = ssl._create_unverified_context()
 from src.constants.constants import AudioConfig
 from src.protocols.protocol import Protocol
 from src.utils.config_manager import ConfigManager
@@ -37,13 +38,15 @@ class WebsocketProtocol(Protocol):
             try:
                 # 新的写法 (在Python 3.11+版本中)
                 self.websocket = await websockets.connect(
-                    uri=self.WEBSOCKET_URL, 
+                    uri=self.WEBSOCKET_URL,
+                    ssl=ssl_context,
                     additional_headers=self.HEADERS
                 )
             except TypeError:
                 # 旧的写法 (在较早的Python版本中)
                 self.websocket = await websockets.connect(
-                    self.WEBSOCKET_URL, 
+                    self.WEBSOCKET_URL,
+                    ssl=ssl_context, 
                     extra_headers=self.HEADERS
                 )
 
