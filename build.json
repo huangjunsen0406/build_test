@@ -7,7 +7,7 @@
     "hooks": "hooks",
     "onefile": false,
     "additional_pyinstaller_args": "--add-data assets;assets --add-data libs;libs --add-data src;src --hidden-import=PyQt5 --hidden-import=numpy._libs --hidden-import=opuslib",
-    "inno_setup_path": "E:\\application\\Inno Setup 6\\ISCC.exe",
+    "inno_setup_path": "C:\\ProgramData\\Chocolatey\\bin\\ISCC.exe",
     "platform_specific": {
         "windows": {
             "format": "exe",
