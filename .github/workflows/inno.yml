@@ -1,0 +1,25 @@
+name: Setup Inno Setup
+
+on:
+  workflow_dispatch:
+
+jobs:
+  install-inno:
+    runs-on: windows-latest
+
+    steps:
+      - name: 安装 Inno Setup（通过 Chocolatey）
+        run: choco install innosetup -y
+        shell: powershell
+
+      - name: 查找 ISCC.exe 路径
+        id: find-iscc
+        run: |
+          $path = Get-Command ISCC.exe | Select-Object -ExpandProperty Source
+          Write-Output "ISCC 安装路径: $path"
+          echo "ISCC_PATH=$path" >> $env:GITHUB_ENV
+        shell: powershell
+
+      - name: 输出 ISCC 安装路径
+        run: echo "Inno Setup 安装路径是：$env:ISCC_PATH"
+        shell: powershell
