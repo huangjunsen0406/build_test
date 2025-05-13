@@ -294,10 +294,6 @@ jobs:
           ENV LC_ALL=C.UTF-8
           ENV LANG=C.UTF-8
           
-          # 配置DNS以解决网络问题
-          RUN echo "nameserver 8.8.8.8" > /etc/resolv.conf \
-              && echo "nameserver 8.8.4.4" >> /etc/resolv.conf
-          
           # 安装基本工具和依赖
           RUN apt-get update || (apt-get clean && apt-get update) \
               && apt-get install -y --no-install-recommends \
@@ -372,7 +368,7 @@ jobs:
           docker build --network=host --no-cache -t xiaozhi-${{ matrix.arch }}-builder -f Dockerfile.${{ matrix.arch }} .
           
           # 运行构建
-          docker run --platform linux/${{ matrix.qemu_platform }} --network=host --rm -v $(pwd):/app xiaozhi-${{ matrix.arch }}-builder
+          docker run --platform linux/${{ matrix.qemu_platform }} --network=host --dns 8.8.8.8 --dns 8.8.4.4 --rm -v $(pwd):/app xiaozhi-${{ matrix.arch }}-builder
         shell: bash
 
       # 重命名Linux安装程序为指定格式
