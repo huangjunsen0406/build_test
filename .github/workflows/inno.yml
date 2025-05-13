@@ -115,10 +115,7 @@ jobs:
           
           # 安装 PyInstaller (使用特定版本)
           pip install pyinstaller==6.13.0 wmi -i https://mirrors.aliyun.com/pypi/simple
-          
-          # 安装 Opus 库
-          pip install opuslib -i https://mirrors.aliyun.com/pypi/simple
-          
+
           conda install numpy=1.24.3 -y
 
       # 拉取 UnifyPy 仓库
