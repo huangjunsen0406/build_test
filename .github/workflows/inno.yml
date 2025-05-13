@@ -53,11 +53,11 @@ jobs:
       - name: 拉取 UnifyPy 仓库
         run: |
           git clone https://github.com/huangjunsen0406/UnifyPy.git
-        shell: bash
+        shell: powershell
 
       # 运行 UnifyPy 构建项目
       - name: 运行 UnifyPy 构建项目
         run: |
           $env:PYTHONIOENCODING = "utf-8"
           python UnifyPy/main.py . --config build.json
-        shell: bash
+        shell: powershell
