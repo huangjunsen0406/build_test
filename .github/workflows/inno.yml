@@ -9,6 +9,10 @@ jobs:
   setup-and-build:
     runs-on: windows-latest
     steps:
+      # 拉取代码
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       # 安装 Inno Setup
       - name: 安装 Inno Setup（通过 Chocolatey）
         run: choco install innosetup -y
@@ -23,41 +27,48 @@ jobs:
           Set-Content -Path iscc_path.txt -Value $path -Encoding UTF8
         shell: powershell
 
-      # 安装 Miniconda 和 Conda
-      - name: 安装 Miniconda 和 Conda
+      # 安装 Miniconda
+      - name: 安装 Miniconda
         uses: conda-incubator/setup-miniconda@v3
         with:
-          python-version: "3.10"
           auto-update-conda: true
           auto-activate-base: false
+          python-version: "3.10"
 
-      # 创建 Conda 环境并安装依赖
+      # 创建并激活 Conda 环境
       - name: 创建 Conda 环境 py-xiaozhi
+        shell: bash
         run: |
+          source "$(conda info --base)/etc/profile.d/conda.sh"
           conda create -n py-xiaozhi python=3.10 -y
-        shell: powershell
 
-      # 安装 Python 依赖（pip + conda + pyinstaller）
+      # 安装 Python 依赖
       - name: 安装 Python 依赖（pip + conda + pyinstaller）
+        shell: bash
         run: |
-          # 激活 Conda 环境
-          & "$(conda info --base)\Scripts\activate" py-xiaozhi
-
-          # 安装依赖
+          source "$(conda info --base)/etc/profile.d/conda.sh"
+          conda activate py-xiaozhi
           pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple
           conda install pyqt=5.15.10 opencv=4.10.0 -y
           pip install pyinstaller
-        shell: powershell
 
       # 拉取 UnifyPy 仓库
       - name: 拉取 UnifyPy 仓库
+        run: git clone https://github.com/huangjunsen0406/UnifyPy.git
+        shell: bash
+
+      # 调试：打印当前目录内容
+      - name: 检查当前目录内容
+        shell: bash
         run: |
-          git clone https://github.com/huangjunsen0406/UnifyPy.git
-        shell: powershell
+          pwd
+          ls -al
 
       # 运行 UnifyPy 构建项目
       - name: 运行 UnifyPy 构建项目
+        shell: bash
         run: |
-          $env:PYTHONIOENCODING = "utf-8"
-          python UnifyPy/main.py . --config build.json
-        shell: powershell
+          source "$(conda info --base)/etc/profile.d/conda.sh"
+          conda activate py-xiaozhi
+          export PYTHONIOENCODING=utf-8
+          python UnifyPy/main.py "$GITHUB_WORKSPACE" --config "$GITHUB_WORKSPACE/build.json"
