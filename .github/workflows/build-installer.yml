@@ -29,6 +29,8 @@ on:
 jobs:
   build-windows:
     runs-on: windows-latest
+    env:
+      PYTHONIOENCODING: utf-8
     steps:
       - name: Checkout build_test
         uses: actions/checkout@v4
@@ -99,6 +101,8 @@ jobs:
           
       - name: Run UnifyPy
         shell: bash -el {0}
+        env:
+          PYTHONIOENCODING: utf-8
         run: |
           cd build_test
           python ../UnifyPy/main.py . --config build.json
