@@ -135,7 +135,8 @@ jobs:
           conda activate py-xiaozhi
           export PYTHONIOENCODING=utf-8
           export PYTHONUTF8=1
-          python ../UnifyPy/main.py . --config build.json
+          export PYTHONUNBUFFERED=1  # 确保Python输出不被缓冲
+          python -u ../UnifyPy/main.py . --config build.json --verbose  # 添加-u参数禁用输出缓冲，并添加--verbose参数(如果UnifyPy支持)
 
       # 只上传 Inno Setup 安装程序
       - name: 上传安装程序
@@ -153,4 +154,21 @@ jobs:
           path: |
             build.json
             dist/
+            xiaozhi.spec
           continue-on-error: true
+
+      # 检查构建结果
+      - name: 检查构建结果
+        if: always()
+        shell: bash
+        run: |
+          echo "检查dist目录内容:"
+          ls -la dist/ || echo "dist目录不存在"
+          
+          echo "检查installer目录内容:"
+          ls -la installer/ || echo "installer目录不存在"
+          
+          echo "检查是否存在关键文件夹:"
+          ls -la assets/ || echo "assets文件夹不存在"
+          ls -la libs/ || echo "libs文件夹不存在"
+          ls -la src/ || echo "src文件夹不存在"
