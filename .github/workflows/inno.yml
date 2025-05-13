@@ -193,6 +193,7 @@ jobs:
 
   build-linux:
     runs-on: ubuntu-22.04
+    timeout-minutes: 180
     strategy:
       fail-fast: false
       matrix:
@@ -321,7 +322,7 @@ jobs:
         if: matrix.arch != 'x64'
         run: |
           cat > Dockerfile.${{ matrix.arch }} << EOF
-          FROM --platform=linux/${{ matrix.qemu_platform }} ${{ matrix.docker_image }}
+          FROM ${{ matrix.docker_image }}
           
           ENV DEBIAN_FRONTEND=noninteractive
           ENV PYTHONIOENCODING=utf-8
@@ -375,7 +376,7 @@ jobs:
               && rm -rf /var/lib/apt/lists/*
           
           # 安装 Miniconda
-          RUN wget -q -O Miniforge3.sh "https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-${{ matrix.platform }}.sh" \
+          RUN wget -q -O Miniforge3.sh "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-${{ matrix.platform }}.sh" \
               && bash Miniforge3.sh -b -p /opt/conda \
               && rm Miniforge3.sh
           
@@ -395,38 +396,42 @@ jobs:
           
           # 安装依赖
           RUN source /opt/conda/bin/activate py-xiaozhi \
-              && pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple --timeout 120 --retries 10 \
-              && pip install meson ninja -i https://pypi.tuna.tsinghua.edu.cn/simple --timeout 120 --retries 10 \
+              && pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple --timeout 300 --retries 10 \
+              && pip install meson ninja -i https://mirrors.aliyun.com/pypi/simple --timeout 300 --retries 10 \
               && pip uninstall numpy -y \
-              && conda install pyqt=5.15.10 opencv=4.10.0 -y \
-              && conda install numpy=1.24.3 blas=*=openblas -y \
-              && pip install pyinstaller==6.13.0 opuslib certifi -i https://pypi.tuna.tsinghua.edu.cn/simple --timeout 120 --retries 10
+              && conda install pyqt=5.15.7 opencv=4.8.0 -y --timeout-secs 600 \
+              && conda install numpy=1.24.3 blas=*=openblas -y --timeout-secs 600 \
+              && pip install pyinstaller==6.13.0 opuslib certifi -i https://mirrors.aliyun.com/pypi/simple --timeout 300 --retries 10
           
           # 克隆 UnifyPy
           RUN mkdir -p /UnifyPy \
               && git clone https://github.com/huangjunsen0406/UnifyPy.git /UnifyPy
           
           # 构建命令
-          CMD source /opt/conda/bin/activate py-xiaozhi \
-              && export PYTHONIOENCODING=utf-8 \
-              && export PYTHONUTF8=1 \
-              && export PYTHONUNBUFFERED=1 \
-              && export DISPLAY=:99 \
-              && export SSL_CERT_FILE=$(python -m certifi) \
-              && mkdir -p /tmp/.X11-unix \
-              && chmod 1777 /tmp/.X11-unix \
-              && Xvfb :99 -screen 0 1024x768x24 -ac +extension GLX +render -noreset &> /dev/null & \
-              && sleep 3 \
-              && python -c "import numpy; print('NumPy 配置:', numpy.__config__.show())" \
-              && mkdir -p models \
-              && python -u /UnifyPy/main.py . --config ./build.json
-          EOF
+          CMD ["bash", "-c", "\
+          source /opt/conda/bin/activate py-xiaozhi && \
+          export PYTHONIOENCODING=utf-8 && \
+          export PYTHONUTF8=1 && \
+          export PYTHONUNBUFFERED=1 && \
+          export DISPLAY=:99 && \
+          export SSL_CERT_FILE=$(python -m certifi) && \
+          mkdir -p /tmp/.X11-unix && \
+          chmod 1777 /tmp/.X11-unix && \
+          Xvfb :99 -screen 0 1024x768x24 -ac +extension GLX +render -noreset &> /dev/null & \
+          sleep 3 && \
+          python -c \"import numpy; print('NumPy 配置:', numpy.__config__.show())\" && \
+          python -c \"import platform; print('平台信息:', platform.machine(), platform.architecture())\" && \
+          python -c \"import sys; print('Python版本:', sys.version)\" && \
+          conda list && \
+          mkdir -p models && \
+          python -u /UnifyPy/main.py . --config ./build.json"]
+
           
           # 构建 Docker 镜像
           docker buildx build --platform linux/${{ matrix.qemu_platform }} --load --cache-from type=local,src=/tmp/.buildx-cache --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max -t xiaozhi-${{ matrix.arch }}-builder -f Dockerfile.${{ matrix.arch }} .
           
           # 运行构建
-          docker run --platform linux/${{ matrix.qemu_platform }} --network=host --dns 8.8.8.8 --dns 8.8.4.4 --rm -v $(pwd):/app xiaozhi-${{ matrix.arch }}-builder
+          docker run --platform linux/${{ matrix.qemu_platform }} --network=host --dns 8.8.8.8 --dns 8.8.4.4 --memory=6g --memory-swap=8g --rm -v $(pwd):/app xiaozhi-${{ matrix.arch }}-builder
         shell: bash
         
       # 移动缓存
