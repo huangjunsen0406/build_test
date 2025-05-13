@@ -9,25 +9,24 @@ jobs:
   setup-and-build:
     runs-on: windows-latest
     steps:
-      # 拉取代码
+      # 1. 拉取代码
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 安装 Inno Setup
+      # 2. 安装 Inno Setup
       - name: 安装 Inno Setup（通过 Chocolatey）
         run: choco install innosetup -y
         shell: powershell
 
-      # 查找 ISCC.exe 路径并设置环境变量
+      # 3. 设置 ISCC.exe 路径为环境变量
       - name: 查找 ISCC.exe 路径并设置环境变量
         run: |
           $path = Get-Command ISCC.exe | Select-Object -ExpandProperty Source
           $envLine = "ISCC_PATH=$($path -replace '`r','' -replace '`n','')"
           [System.IO.File]::AppendAllText($env:GITHUB_ENV, "$envLine`n", [System.Text.Encoding]::UTF8)
-          Set-Content -Path iscc_path.txt -Value $path -Encoding UTF8
         shell: powershell
 
-      # 安装 Miniconda
+      # 4. 安装 Miniconda
       - name: 安装 Miniconda
         uses: conda-incubator/setup-miniconda@v3
         with:
@@ -35,14 +34,14 @@ jobs:
           auto-activate-base: false
           python-version: "3.10"
 
-      # 创建并激活 Conda 环境
+      # 5. 创建 Conda 环境
       - name: 创建 Conda 环境 py-xiaozhi
         shell: bash
         run: |
           source "$(conda info --base)/etc/profile.d/conda.sh"
           conda create -n py-xiaozhi python=3.10 -y
 
-      # 安装 Python 依赖
+      # 6. 安装 Python 依赖
       - name: 安装 Python 依赖（pip + conda + pyinstaller）
         shell: bash
         run: |
@@ -52,19 +51,21 @@ jobs:
           conda install pyqt=5.15.10 opencv=4.10.0 -y
           pip install pyinstaller
 
-      # 拉取 UnifyPy 仓库
+      # 7. 克隆 UnifyPy 仓库
       - name: 拉取 UnifyPy 仓库
         run: git clone https://github.com/huangjunsen0406/UnifyPy.git
         shell: bash
 
-      # 调试：打印当前目录内容
-      - name: 检查当前目录内容
+      # 8. 打印目录调试
+      - name: 打印当前目录内容（调试用）
         shell: bash
         run: |
+          echo "当前路径为："
           pwd
+          echo "当前目录内容为："
           ls -al
 
-      # 运行 UnifyPy 构建项目
+      # 9. 执行 UnifyPy 构建流程
       - name: 运行 UnifyPy 构建项目
         shell: bash
         run: |
