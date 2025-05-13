@@ -1,4 +1,4 @@
-name: Setup Inno Setup
+name: Setup Inno Setup and Build
 
 on:
   push:
@@ -10,31 +10,38 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      # 拉取仓库代码
-      - name: 拉取仓库代码
-        uses: actions/checkout@v4
-
       # 安装 Inno Setup（通过 Chocolatey）
       - name: 安装 Inno Setup（通过 Chocolatey）
         run: choco install innosetup -y
         shell: powershell
 
-      # 查找 ISCC.exe 路径并写入 build.json
-      - name: 查找 ISCC.exe 路径并写入 build.json
+      # 查找 ISCC.exe 路径并设置环境变量
+      - name: 查找 ISCC.exe 路径并设置环境变量
         run: |
-          $isccPath = Get-Command ISCC.exe | Select-Object -ExpandProperty Source
-          $jsonPath = "build.json"
-          $json = Get-Content $jsonPath -Raw | ConvertFrom-Json
-          $json.inno_setup_path = $isccPath
-          $json | ConvertTo-Json -Depth 10 | Out-File -FilePath $jsonPath -Encoding UTF8
+          $path = Get-Command ISCC.exe | Select-Object -ExpandProperty Source
+          $envLine = "ISCC_PATH=$($path -replace '`r','' -replace '`n','')"
+          [System.IO.File]::AppendAllText($env:GITHUB_ENV, "$envLine`n", [System.Text.Encoding]::UTF8)
+
+          # （可选）写入一个临时文件中方便上传或调试
+          Set-Content -Path iscc_path.txt -Value $path -Encoding UTF8
         shell: powershell
 
+      # 上传 ISCC 路径文件（可选）
+      - name: 上传 ISCC 路径文件（可选）
+        uses: actions/upload-artifact@v4
+        with:
+          name: iscc-path
+          path: iscc_path.txt
+
+  setup-conda-environment:
+    runs-on: windows-latest
+
+    steps:
       # 安装 Miniconda
       - name: 安装 Miniconda
         uses: conda-incubator/setup-miniconda@v3
         with:
-          activate-environment: py-xiaozhi
-          environment-name: py-xiaozhi
+          env-name: py-xiaozhi   # 使用 env-name 替代 environment-name
           python-version: 3.10
           auto-update-conda: true
           auto-activate-base: false
@@ -68,3 +75,18 @@ jobs:
           # ✅ 安装 PyInstaller
           pip install pyinstaller
 
+  clone-unifypy:
+    runs-on: windows-latest
+
+    steps:
+      # 拉取 UnifyPy 仓库
+      - name: 拉取 UnifyPy 仓库
+        run: |
+          git clone https://github.com/huangjunsen0406/UnifyPy.git
+        shell: bash
+
+      # 运行 UnifyPy 构建项目
+      - name: 运行 UnifyPy 构建项目
+        run: |
+          python UnifyPy/main.py . --config build.json
+        shell: bash
