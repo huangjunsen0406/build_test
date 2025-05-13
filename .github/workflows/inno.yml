@@ -115,86 +115,27 @@ jobs:
           
           # 安装 PyInstaller (使用特定版本)
           pip install pyinstaller==6.13.0 wmi -i https://mirrors.aliyun.com/pypi/simple
-
+          
+          # 安装 Opus 库
+          pip install opuslib -i https://mirrors.aliyun.com/pypi/simple
+          
           conda install numpy=1.24.3 -y
 
-      # 拉取 UnifyPy 仓库
-      - name: 拉取 UnifyPy 仓库
-        run: git clone https://github.com/huangjunsen0406/UnifyPy.git
+      # 创建与本地环境类似的目录结构
+      - name: 创建工作目录结构
+        run: |
+          mkdir -p ../UnifyPy
+          git clone https://github.com/huangjunsen0406/UnifyPy.git ../UnifyPy
         shell: bash
 
-      # 运行 UnifyPy 构建项目
+      # 运行 UnifyPy 构建项目，使用类似本地的路径结构
       - name: 运行 UnifyPy 构建项目
         shell: bash -el {0}
         run: |
           conda activate py-xiaozhi
           export PYTHONIOENCODING=utf-8
           export PYTHONUTF8=1
-          
-          # 检查源文件结构
-          echo "检查源文件结构..."
-          echo "src目录内容:"
-          ls -la src/
-          echo "src/display目录内容:"
-          ls -la src/display/ || echo "src/display目录不存在"
-          
-          # 运行UnifyPy
-          python UnifyPy/main.py . --config build.json
-          
-          # 检查打包后的文件结构
-          echo "检查打包后的文件结构..."
-          if [ -d "dist" ]; then
-            echo "dist目录内容:"
-            ls -la dist/
-            
-            # 查找主程序目录
-            MAIN_DIR=$(find dist -name "build_test" -type d | head -1)
-            if [ -n "$MAIN_DIR" ]; then
-              echo "找到主程序目录: $MAIN_DIR"
-              
-              # 确保src目录存在于打包后的文件中
-              if [ ! -d "$MAIN_DIR/src" ]; then
-                echo "手动复制src目录到打包目录..."
-                mkdir -p "$MAIN_DIR/src"
-                cp -r src/* "$MAIN_DIR/src/"
-                echo "复制完成，检查结果:"
-                ls -la "$MAIN_DIR/src/"
-              else
-                echo "src目录已存在于打包目录中"
-              fi
-              
-              # 确保display目录和UI文件存在
-              if [ ! -d "$MAIN_DIR/src/display" ] || [ ! -f "$MAIN_DIR/src/display/gui_display.ui" ]; then
-                echo "手动复制display目录和UI文件..."
-                mkdir -p "$MAIN_DIR/src/display"
-                
-                # 如果源文件存在，则复制
-                if [ -f "src/display/gui_display.ui" ]; then
-                  cp -f src/display/gui_display.ui "$MAIN_DIR/src/display/"
-                  echo "UI文件复制完成"
-                else
-                  echo "警告: 源UI文件不存在!"
-                fi
-                
-                # 复制display目录下的所有Python文件
-                cp -f src/display/*.py "$MAIN_DIR/src/display/" 2>/dev/null || echo "没有Python文件可复制"
-                
-                echo "复制完成，检查结果:"
-                ls -la "$MAIN_DIR/src/display/"
-              else
-                echo "display目录和UI文件已存在"
-              fi
-            else
-              echo "未找到主程序目录"
-            fi
-            
-            echo "查找dist中的src目录:"
-            find dist -name "src" -type d || echo "dist中未找到src目录"
-            echo "查找dist中的display目录:"
-            find dist -name "display" -type d || echo "dist中未找到display目录"
-          else
-            echo "dist目录不存在"
-          fi
+          python ../UnifyPy/main.py . --config build.json
 
       # 只上传 Inno Setup 安装程序
       - name: 上传安装程序
@@ -212,6 +153,4 @@ jobs:
           path: |
             build.json
             dist/
-            src/
-            main.py
           continue-on-error: true
