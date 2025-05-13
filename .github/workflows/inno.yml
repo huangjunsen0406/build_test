@@ -1,4 +1,4 @@
-name: Setup Inno Setup and Build
+name: Setup Inno Setup, Conda, and Build
 
 on:
   push:
@@ -6,10 +6,10 @@ on:
       - main
 
 jobs:
-  install-inno:
+  setup-and-build:
     runs-on: windows-latest
     steps:
-      # 安装 Inno Setup（通过 Chocolatey）
+      # 安装 Inno Setup
       - name: 安装 Inno Setup（通过 Chocolatey）
         run: choco install innosetup -y
         shell: powershell
@@ -23,19 +23,8 @@ jobs:
           Set-Content -Path iscc_path.txt -Value $path -Encoding UTF8
         shell: powershell
 
-      # 上传 ISCC 路径文件（可选）
-      - name: 上传 ISCC 路径文件（可选）
-        uses: actions/upload-artifact@v4
-        with:
-          name: iscc-path
-          path: iscc_path.txt
-
-  setup-conda-environment:
-    runs-on: windows-latest
-    needs: install-inno  # 确保安装 Inno 后再执行
-    steps:
-      # 安装 Miniconda
-      - name: 安装 Miniconda
+      # 安装 Miniconda 和 Python 环境
+      - name: 安装 Miniconda 和 Conda 环境
         uses: conda-incubator/setup-miniconda@v3
         with:
           env-name: py-xiaozhi
@@ -45,21 +34,16 @@ jobs:
 
       # 安装 Python 依赖
       - name: 安装 Python 依赖（pip + conda + pyinstaller）
-        shell: bash
         run: |
           # 初始化 Conda 环境
           source "$(conda info --base)/etc/profile.d/conda.sh"
           conda activate py-xiaozhi
 
-          # 安装要求的依赖
+          # 安装依赖
           pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple
           conda install pyqt=5.15.10 opencv=4.10.0 -y
           pip install pyinstaller
 
-  clone-unifypy:
-    runs-on: windows-latest
-    needs: setup-conda-environment  # 确保设置 Conda 后再拉取 UnifyPy
-    steps:
       # 拉取 UnifyPy 仓库
       - name: 拉取 UnifyPy 仓库
         run: |
