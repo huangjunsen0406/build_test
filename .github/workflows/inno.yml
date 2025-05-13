@@ -111,11 +111,9 @@ jobs:
           export PYTHONIOENCODING=utf-8
           python UnifyPy/main.py . --config build.json
           
-      # 上传构建结果（可选）
-      - name: 上传构建结果
+      # 只上传 Inno Setup 安装程序
+      - name: 上传安装程序
         uses: actions/upload-artifact@v4
         with:
-          name: build-output
-          path: |
-            dist/
-            output/
+          name: installer-setup
+          path: installer/
