@@ -41,7 +41,7 @@ jobs:
 
       - name: 构建可执行文件
         run: |
-          python UnifyPy/main.py . --config build.json
+          python UnifyPy/main.py . --config build.json --skip-installer
         env:
           PYTHONIOENCODING: utf-8
           PYTHONUTF8: 1
@@ -49,8 +49,8 @@ jobs:
       - name: 使用Inno Setup构建安装程序
         uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
         with:
-          path: dist/installer/setup.iss
-          options: /O+
+          path: UnifyPy/templates/setup.iss.template
+          options: /O+ /DMyAppVersion="1.0.0" /DMyAppName="xiaozhi" /DMyAppPublisher="Junsen" /DMyAppExeName="xiaozhi.exe" /DMyOutputDir="dist\installer"
 
       - name: 上传构建产物
         uses: actions/upload-artifact@v4
@@ -148,5 +148,5 @@ jobs:
         with:
           name: linux-installer
           path: |
-            dist/installer/xiaozhi_1.0.0_amd64.deb
+            dist/installer/**
             dist/xiaozhi/** 
