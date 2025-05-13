@@ -188,6 +188,7 @@ jobs:
   build-linux:
     runs-on: ubuntu-22.04
     strategy:
+      fail-fast: false
       matrix:
         arch: [x64, arm64, arm]
         include:
@@ -408,6 +409,7 @@ jobs:
 
       - name: 上传Linux调试信息
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: linux-${{ matrix.arch }}-debug-info
@@ -415,4 +417,3 @@ jobs:
             build.json
             dist/
             xiaozhi.spec
-          continue-on-error: true
